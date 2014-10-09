@@ -13,7 +13,7 @@ function Graph() {
 	}
 }
 
-Graph.prototype.setDirectedEdges = function (adjacency_list) {
+Graph.prototype.addEdgesFromHalfAdjList = function (adjacency_list) {
 	var i, j;
 
 	this.size = adjacency_list.length;
@@ -65,30 +65,25 @@ function bfs(graph) {
 function Ant(graph, choose_fn) {
 	var i;
 
-	this.graph = graph;
-	this.chooseEdge = choose_fn;
+	if (graph) {
+		this.graph = graph;
+		this.chooseEdge = choose_fn;
 
-	this.current_node = graph.source;
-	this.nodes = [this.current_node];
-	this.visited = [];
-	for (i = 0; i < this.graph.size; i++) {
-		this.visited[i] = false;
+		this.current_node = graph.source;
+		this.nodes = [this.current_node];
+		this.visited = [];
+		for (i = 0; i < this.graph.size; i++) {
+			this.visited[i] = false;
+		}
+		this.visited[this.current_node] = true;
 	}
-	this.visited[this.current_node] = true;
 }
 
 /**
  * Choose an edge and move along it.
  */
 Ant.prototype.step = function() {
-	var e, t;
-	t = this;
-	e = this.chooseEdge(this.graph.edges[this.current_node].filter(
-		function(e){ return !t.visited[e.to]; }
-	));
-	this.current_node = e.to;
-	this.nodes.push(this.current_node);
-	this.visited[this.current_node] = true;
+	throw new Error("This is an 'abstract' method that should be everwriten.");
 }
 
 Ant.prototype.done = function() {
@@ -104,8 +99,25 @@ Ant.prototype.solution = function () {
 	}
 }
 
+function ShortestPathAnt(graph, choice_fn) {
+	this.Ant = Ant;
+	this.Ant(graph, choice_fn);
+}
+ShortestPathAnt.prototype = new Ant;
 
-function ACO(graph, parameters, num_ants) {
+ShortestPathAnt.prototype.step = function() {
+	var e, t;
+	t = this;
+	e = this.chooseEdge(this.graph.edges[this.current_node].filter(
+		function(e){ return !t.visited[e.to]; }
+	));
+	this.current_node = e.to;
+	this.nodes.push(this.current_node);
+	this.visited[this.current_node] = true;
+	return e;
+}
+
+function ACO(graph, parameters, ant_type, num_ants) {
 	var k;
 
 	// Save parameters.
@@ -118,6 +130,7 @@ function ACO(graph, parameters, num_ants) {
 	}
 	for (k in parameters) this.parameters[k] = parameters[k];
 
+	this.Ant = ant_type;
 	this.num_ants = num_ants;
 
 	this.choice_fn = make_default_choice_fn(this);
@@ -168,6 +181,7 @@ ACO.prototype.getPheromone = function(e) {
 	var j = e.from > e.to ? e.to : e.from;
 	return this.pheromone[i][j];
 }
+
 ACO.prototype.setPheromone = function(e, v) {
 	var i = e.from > e.to ? e.from : e.to;
 	var j = e.from > e.to ? e.to : e.from;
@@ -186,7 +200,7 @@ ACO.prototype.runIteration = function() {
 	console.log("Starting iteration");
 	for (i = 0; i < this.num_ants; i++) {
 		// 1. Generate Ants
-		ant = new Ant(this.graph, this.choice_fn);
+		ant = new this.Ant(this.graph, this.choice_fn);
 		//console.log("new ant", ant);
 
 		// 2. Generate Solutions.
@@ -239,7 +253,7 @@ function main() {
 			[],     // 4
 		];
 	graph = new Graph();
-	graph.setDirectedEdges(adj_list);
+	graph.addEdgesFromHalfAdjList(adj_list);
 	graph.source = 0;
 	graph.sink = 4;
 	console.log("Graph", graph);
@@ -247,13 +261,15 @@ function main() {
 	ants = 10;
 	iterations = 10;
 
-	aco = new ACO(graph, {}, ants);
+	aco = new ACO(graph, {}, ShortestPathAnt, ants);
 	console.log("ACO", aco);
 	for (i = 0; i < iterations; i++) {
 		aco.runIteration();
 		console.log("pheromone", aco.pheromone);
 		console.log("best so far", aco.getBestSolution());
 	}
+
+	console.log("bfs", bfs(graph));
 }
 
 main();
