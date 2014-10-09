@@ -14,15 +14,29 @@ function Graph() {
 }
 
 Graph.prototype.setDirectedEdges = function (adjacency_list) {
+	var i, j;
+
 	this.size = adjacency_list.length;
 	this.edges = [];
-	for (var i = 0; i < adjacency_list.length; i++) this.edges.push([]);
-	for (var i = 0; i < adjacency_list.length; i++) {
-		for (var j = 0; j < adjacency_list[i].length; j++) {
+	for (i = 0; i < adjacency_list.length; i++) this.edges.push([]);
+	for (i = 0; i < adjacency_list.length; i++) {
+		for (j = 0; j < adjacency_list[i].length; j++) {
 			this.edges[i].push(new Edge(i, adjacency_list[i][j]));
 			this.edges[adjacency_list[i][j]].push(new Edge(adjacency_list[i][j], i));
 		}
 	}
+}
+
+function bfs(graph) {
+	var q = [];
+
+	t = this;
+	e = this.chooseEdge(this.graph.edges[this.current_node].filter(
+		function(e){ return !t.visited[e.to]; }
+	));
+	this.current_node = e.to;
+	this.nodes.push(this.current_node);
+	this.visited[this.current_node] = true;
 }
 
 function Ant(graph, choose_fn) {
@@ -69,6 +83,8 @@ Ant.prototype.solution = function () {
 
 
 function ACO(graph, parameters, num_ants) {
+	var k;
+
 	// Save parameters.
 	this.graph = graph;
 	this.parameters = {
@@ -77,7 +93,7 @@ function ACO(graph, parameters, num_ants) {
 		beta: 0.3,
 		evaporation_decay: 0.1
 	}
-	for (var k in parameters) this.parameters[k] = parameters[k];
+	for (k in parameters) this.parameters[k] = parameters[k];
 
 	this.num_ants = num_ants;
 
@@ -89,18 +105,19 @@ function ACO(graph, parameters, num_ants) {
 function make_default_choice_fn(aco) {
 	return function(edges) {
 		//console.log("choosing between", edges);
-		var total_weight = 0;
-		var weights = [];
-		for (var i = 0; i < edges.length; i++) {
-			var e = edges[i];
+		var roll, i, e,
+			total_weight = 0,
+			weights = [];
+
+		for (i = 0; i < edges.length; i++) {
+			e = edges[i];
 			weights[i] = Math.pow(aco.getPheromone(e), aco.parameters.alpha) + 
 				Math.pow(aco.graph.heuristic(e), aco.parameters.beta);
 			total_weight += weights[i];
 		}
 		//console.log("weights", weights);
 
-		var roll = Math.random() * total_weight;
-		var i;
+		roll = Math.random() * total_weight;
 		for (i = 0; roll > weights[i]; i++) roll -= weights[i];
 		return edges[i];
 	}
@@ -108,10 +125,12 @@ function make_default_choice_fn(aco) {
 
 // Set up state.
 ACO.prototype.init = function () {
+	var i, j;
+
 	this.pheromone = [];
-	for (var i = 0; i < this.graph.size; i++) {
+	for (i = 0; i < this.graph.size; i++) {
 		this.pheromone.push([]);
-		for (var j = 0; j < i; j++) {
+		for (j = 0; j < i; j++) {
 			this.pheromone[i][j] = this.parameters.initial_pheromone;
 		}
 	}
@@ -137,17 +156,19 @@ ACO.prototype.getBestSolution = function() {
 }
 
 ACO.prototype.runIteration = function() {
+	var i, j, e, s, ant, edge,
+	   	p = this.parameters,
+	   	solutions = [];
+
 	console.log("Starting iteration");
-	var p = this.parameters;
-	var solutions = [];
-	for (var i = 0; i < this.num_ants; i++) {
+	for (i = 0; i < this.num_ants; i++) {
 		// 1. Generate Ants
-		var ant = new Ant(this.graph, this.choice_fn);
+		ant = new Ant(this.graph, this.choice_fn);
 		//console.log("new ant", ant);
 
 		// 2. Generate Solutions.
 		while (!ant.done()) {
-			var edge = ant.step();
+			edge = ant.step();
 			// no deamon jobs
 		}
 		//console.log("ant done", ant);
@@ -157,22 +178,22 @@ ACO.prototype.runIteration = function() {
 
 	// 3. Global Update Pheromone.
 	// Evaporation.
-	var e = new Edge(0, 0);
-	for (var i = 0; i < this.graph.size; i++) {
+	e = new Edge(0, 0);
+	for (i = 0; i < this.graph.size; i++) {
 		e.from = i;
-		for (var j = 0; j < i; j++) {
+		for (j = 0; j < i; j++) {
 			e.to = j;
 			this.setPheromone(e, (1 - p.evaporation_decay) * this.getPheromone(e));
 		}
 	}
 	// All ants lay pheromone.
-	for (var s = 0; s < solutions.length; s++) {
+	for (s = 0; s < solutions.length; s++) {
 		if (!this.solutions.global_best ||
 				solutions[s].goodness > this.solutions.global_best.goodness) {
 			this.solutions.global_best = solutions[s];
 		}
-		var e = new Edge(-1, solutions[s].nodes[0]);
-		for (var i = 1; i < solutions[s].nodes.length; i++) {
+		e = new Edge(-1, solutions[s].nodes[0]);
+		for (i = 1; i < solutions[s].nodes.length; i++) {
 			e.from = e.to;
 			e.to = solutions[s].nodes[i];
 			this.setPheromone(e, this.getPheromone(e) + solutions[s].goodness);
