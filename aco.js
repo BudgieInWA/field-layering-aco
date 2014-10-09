@@ -3,6 +3,28 @@ function Edge(from, to) {
 	this.to = to;
 }
 
+function Graph() {
+	this.size = 0;
+	this.edges = [];
+	this.source = null;
+	this.sink = null;
+	this.heuristic = function (g, e) {
+		return 0;
+	}
+}
+
+Graph.prototype.setDirectedEdges = function (adjacency_list) {
+	this.size = adjacency_list.length;
+	this.edges = [];
+	for (var i = 0; i < adjacency_list.length; i++) this.edges.push([]);
+	for (var i = 0; i < adjacency_list.length; i++) {
+		for (var j = 0; j < adjacency_list[i].length; j++) {
+			this.edges[i].push(new Edge(i, adjacency_list[i][j]));
+			this.edges[adjacency_list[i][j]].push(new Edge(adjacency_list[i][j], i));
+		}
+	}
+}
+
 function Ant(graph, choose_fn) {
 	var i;
 
@@ -159,41 +181,31 @@ ACO.prototype.runIteration = function() {
 }
 
 function main() {
+	var ants, iterations, aco, graph, i, adj_list;
 	//   -1-
 	//  /   \
 	//  0    4
 	//  \   /
 	//   2-3
-	var graph = {
-		size: 5,
-		edges: [],
-		source: 0,
-		sink: 4,
-		heuristic: function (e) {
-			return 0;
-		}
-	}
-	var adj_list = [
+	adj_list = [
 			[1, 2], // 0
 			[4],    // 1
 			[3],    // 2
 			[4],    // 3
 			[],     // 4
 		];
-	for (var i = 0; i < adj_list.length; i++) graph.edges.push([]);
-	for (var i = 0; i < adj_list.length; i++) {
-		for (var j = 0; j < adj_list[i].length; j++) {
-			graph.edges[i].push(new Edge(i, adj_list[i][j]));
-			graph.edges[adj_list[i][j]].push(new Edge(adj_list[i][j], i));
-		}
-	}
+	graph = new Graph();
+	graph.setDirectedEdges(adj_list);
+	graph.source = 0;
+	graph.sink = 4;
+	console.log("Graph", graph);
 
-	var ants = 10;
-	var iterations = 10;
+	ants = 10;
+	iterations = 10;
 
-	var aco = new ACO(graph, {}, ants);
+	aco = new ACO(graph, {}, ants);
 	console.log("ACO", aco);
-	for (var i = 0; i < iterations; i++) {
+	for (i = 0; i < iterations; i++) {
 		aco.runIteration();
 		console.log("pheromone", aco.pheromone);
 		console.log("best so far", aco.getBestSolution());
