@@ -4,20 +4,32 @@ function Edge(from, to) {
 }
 
 function Ant(graph, choose_fn) {
+	var i;
+
 	this.graph = graph;
 	this.chooseEdge = choose_fn;
 
 	this.current_node = graph.source;
 	this.nodes = [this.current_node];
+	this.visited = [];
+	for (i = 0; i < this.graph.size; i++) {
+		this.visited[i] = false;
+	}
+	this.visited[this.current_node] = true;
 }
 
 /**
  * Choose an edge and move along it.
  */
 Ant.prototype.step = function() {
-	var e = this.chooseEdge(this.graph.edges[this.current_node]);
+	var e, t;
+	t = this;
+	e = this.chooseEdge(this.graph.edges[this.current_node].filter(
+		function(e){ return !t.visited[e.to]; }
+	));
 	this.current_node = e.to;
 	this.nodes.push(this.current_node);
+	this.visited[this.current_node] = true;
 }
 
 Ant.prototype.done = function() {
