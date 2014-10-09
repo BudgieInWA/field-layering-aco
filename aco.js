@@ -28,15 +28,38 @@ Graph.prototype.setDirectedEdges = function (adjacency_list) {
 }
 
 function bfs(graph) {
-	var q = [];
+	var i,
+		q = [],
+		visited = [],
+		parents = [],
+		path = [];
 
-	t = this;
-	e = this.chooseEdge(this.graph.edges[this.current_node].filter(
-		function(e){ return !t.visited[e.to]; }
-	));
-	this.current_node = e.to;
-	this.nodes.push(this.current_node);
-	this.visited[this.current_node] = true;
+	for (i = 0; i < graph.size; i++) {
+		visited[i] = false;
+	}
+	q.push(graph.source);
+	visited[graph.source] = true;
+
+	while (q.length > 0) {
+		n = q.shift();
+		if (n === graph.sink) break;
+		for (i = 0; i < graph.size; i++) {
+			for (j = 0; j < graph.edges[i].length; j++) {
+				e = graph.edges[i][j];
+				if (!visited[e.to]) {
+					visited[e.to] = true;
+					parents[e.to] = e.from;
+					q.push(e.to);
+				}
+			}
+		}
+	}
+	n = graph.sink;
+	while (n !== undefined) {
+		path.push(n);
+		n = parents[n];
+	}
+	return path.reverse();
 }
 
 function Ant(graph, choose_fn) {
