@@ -1,10 +1,3 @@
-/**
- * Means an "abstract" method, (one that is meant to be implemented by a subclass) was not
- * implemented.
- */
-function AbstractMethodError() {}
-
-
 function Edge(from, to) {
 	this.from = from;
 	this.to = to;
@@ -15,13 +8,12 @@ function Graph() {
 	this.size = 0;
 }
 
-
 Graph.prototype.heuristic = function(e) {
 	return 0;
 }
 
 Graph.prototype.getEdgesFromNode = function(n) {
-	throw new AbstractMethodError();
+	return [];
 }
 
 
@@ -86,47 +78,58 @@ ShortestPathGraph.prototype.getShortestPath = function() {
 	return path.reverse();
 }
 
-function Ant(graph, choose_fn) {
-	var i;
 
+function Ant(graph, choose_fn) {
 	if (graph) {
 		this.graph = graph;
 		this.chooseEdge = choose_fn;
-
-		// TODO this is ShortestPathAnt specific
-		this.current_node = graph.source;
-		this.nodes = [this.current_node];
-		this.visited = [];
-		for (i = 0; i < this.graph.size; i++) {
-			this.visited[i] = false;
-		}
-		this.visited[this.current_node] = true;
+		this.edges = [];
 	}
 }
 
 /**
- * Choose an edge and move along it.
+ * Take one step towards building a solution.
+ *
+ * This is an example function and should be replaced in subclasses.
  */
 Ant.prototype.step = function() {
-	throw new AbstractMethodError();
+	var e = this.chooseEdge(graph.getAllEdges());
+	this.edges.push(e);
+	return e;
 }
 
 Ant.prototype.done = function() {
-	return this.current_node === this.graph.sink;
+	return false;
 }
 
+/**
+ * Returns the ants solution.
+ *
+ * This is an example function and should be replaced in sublcasses.
+ */
 Ant.prototype.solution = function () {
 	if (!this.done()) throw new Error("not done");
 
 	return {
-		nodes: this.nodes,
-		goodness: 1 / this.nodes.length
+		edges: this.edges,
+		goodness: 0
 	}
 }
 
+
 function ShortestPathAnt(graph, choice_fn) {
+	var i;
+
 	this.Ant = Ant;
 	this.Ant(graph, choice_fn);
+
+	this.current_node = graph.source;
+	this.nodes = [this.current_node];
+	this.visited = [];
+	for (i = 0; i < this.graph.size; i++) {
+		this.visited[i] = false;
+	}
+	this.visited[this.current_node] = true;
 }
 ShortestPathAnt.prototype = new Ant;
 
@@ -141,6 +144,20 @@ ShortestPathAnt.prototype.step = function() {
 	this.visited[this.current_node] = true;
 	return e;
 }
+
+ShortestPathAnt.prototype.done = function() {
+	return this.current_node === this.graph.sink;
+}
+
+ShortestPathAnt.prototype.solution = function () {
+	if (!this.done()) throw new Error("not done");
+
+	return {
+		nodes: this.nodes,
+		goodness: 1 / this.nodes.length
+	}
+}
+
 
 function ACO(graph, parameters, ant_type, num_ants) {
 	var k;
@@ -262,6 +279,7 @@ ACO.prototype.runIteration = function() {
 		}
 	}
 }
+
 
 function main() {
 	var ants, iterations, aco, graph, i, adj_list;
