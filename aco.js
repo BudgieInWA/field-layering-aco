@@ -1,19 +1,38 @@
+/**
+ * Means an "abstract" method, (one that is meant to be implemented by a subclass) was not
+ * implemented.
+ */
+function AbstractMethodError() {}
+
+
 function Edge(from, to) {
 	this.from = from;
 	this.to = to;
 }
 
+
 function Graph() {
 	this.size = 0;
-	this.edges = [];
-	this.source = null;
-	this.sink = null;
-	this.heuristic = function (g, e) {
-		return 0;
-	}
 }
 
-Graph.prototype.addEdgesFromHalfAdjList = function (adjacency_list) {
+
+Graph.prototype.heuristic = function(e) {
+	return 0;
+}
+
+Graph.prototype.getEdgesFromNode = function(n) {
+	throw new AbstractMethodError();
+}
+
+
+function ShortestPathGraph() {
+	this.source = null;
+	this.sink = null;
+	this.edges = [];
+}
+ShortestPathGraph.prototype = new Graph;
+
+ShortestPathGraph.prototype.withEdgesFromHalfAdjList = function (adjacency_list) {
 	var i, j;
 
 	this.size = adjacency_list.length;
@@ -25,27 +44,32 @@ Graph.prototype.addEdgesFromHalfAdjList = function (adjacency_list) {
 			this.edges[adjacency_list[i][j]].push(new Edge(adjacency_list[i][j], i));
 		}
 	}
+	return this;
 }
 
-function bfs(graph) {
+ShortestPathGraph.prototype.getEdgesFromNode = function(n) {
+	return this.edges[n];
+}
+
+ShortestPathGraph.prototype.getShortestPath = function() {
 	var i,
 		q = [],
 		visited = [],
 		parents = [],
 		path = [];
 
-	for (i = 0; i < graph.size; i++) {
+	for (i = 0; i < this.size; i++) {
 		visited[i] = false;
 	}
-	q.push(graph.source);
-	visited[graph.source] = true;
+	q.push(this.source);
+	visited[this.source] = true;
 
 	while (q.length > 0) {
 		n = q.shift();
-		if (n === graph.sink) break;
-		for (i = 0; i < graph.size; i++) {
-			for (j = 0; j < graph.edges[i].length; j++) {
-				e = graph.edges[i][j];
+		if (n === this.sink) break;
+		for (i = 0; i < this.size; i++) {
+			for (j = 0; j < this.edges[i].length; j++) {
+				e = this.edges[i][j];
 				if (!visited[e.to]) {
 					visited[e.to] = true;
 					parents[e.to] = e.from;
@@ -54,7 +78,7 @@ function bfs(graph) {
 			}
 		}
 	}
-	n = graph.sink;
+	n = this.sink;
 	while (n !== undefined) {
 		path.push(n);
 		n = parents[n];
@@ -69,6 +93,7 @@ function Ant(graph, choose_fn) {
 		this.graph = graph;
 		this.chooseEdge = choose_fn;
 
+		// TODO this is ShortestPathAnt specific
 		this.current_node = graph.source;
 		this.nodes = [this.current_node];
 		this.visited = [];
@@ -83,7 +108,7 @@ function Ant(graph, choose_fn) {
  * Choose an edge and move along it.
  */
 Ant.prototype.step = function() {
-	throw new Error("This is an 'abstract' method that should be everwriten.");
+	throw new AbstractMethodError();
 }
 
 Ant.prototype.done = function() {
@@ -108,7 +133,7 @@ ShortestPathAnt.prototype = new Ant;
 ShortestPathAnt.prototype.step = function() {
 	var e, t;
 	t = this;
-	e = this.chooseEdge(this.graph.edges[this.current_node].filter(
+	e = this.chooseEdge(this.graph.getEdgesFromNode(this.current_node).filter(
 		function(e){ return !t.visited[e.to]; }
 	));
 	this.current_node = e.to;
@@ -252,8 +277,7 @@ function main() {
 			[4],    // 3
 			[],     // 4
 		];
-	graph = new Graph();
-	graph.addEdgesFromHalfAdjList(adj_list);
+	graph = new ShortestPathGraph().withEdgesFromHalfAdjList(adj_list);
 	graph.source = 0;
 	graph.sink = 4;
 	console.log("Graph", graph);
@@ -269,7 +293,7 @@ function main() {
 		console.log("best so far", aco.getBestSolution());
 	}
 
-	console.log("bfs", bfs(graph));
+	console.log("bfs", graph.getShortestPath());
 }
 
 main();
