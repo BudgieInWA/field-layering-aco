@@ -79,6 +79,161 @@ ShortestPathGraph.prototype.getShortestPath = function() {
 }
 
 
+function Point(x, y) {
+	this.x = x;
+	this.y = y;
+}
+function LiteralGraph(points) {
+	var i, j;
+
+	this.size = points.length;
+	this.points = points;
+
+	this.edges = [];
+	for (i = 0; i < this.size; i++) {
+		this.edges.push([]);
+		for (j = 0; j < this.size; j++) {
+			if (i != j) {
+				this.edges[i].push(new Edge(i, j));
+			}
+		}
+	}
+}
+LiteralGraph.prototype = new Graph;
+
+LiteralGraph.prototype.getEdgesFromNode = function(n) {
+	return edges[n];
+}
+
+function NodeDLL(node, left, right) { // Node Doubly Linked List
+	this.node = node;
+	this.left = left;
+	this.right = right;
+}
+function LiteralAnt(graph, choice_fn) {
+	var i;
+	this.Ant = Ant;
+	this.Ant(graph, choice_fn);
+	
+    this.edges = [];
+    this.perimeter = []; // Put NodeDLLs in here
+	this.node_to_perim = {}; // map from node id to NodeDLL in perim
+    this.internal_edges = {};
+	this.outside_hull = [];
+	for (i = 0; i < this.graph.size; i++) {
+	   	this.outside_hull.push(true); 
+		this.node_to_perimeter_id[i] = -1;
+	}
+}
+
+LiteralAnt.prototype.step = function() {
+	var n, i,
+		l, r, a, b, next, goright,
+		candidate_edges = {},
+		p = function(n) { return this.graph.getPoint(n); };
+
+	// First we need to choose an point to walk to (before promptly walking back to our hull).
+	// We consider each point outside of our hull.
+	for (n = 0; n < this.graph.size; n++) {
+		if (!this.outside_hull[n]) continue;
+		//TODO detect if the point is outside the hull, here or when we change the perimiter.
+
+		// We want to consider visiting this node from our hull then walking straight back,
+		// creating a new convex hull by adding the travelled edges. To do that, we need:
+		// e1, e2 = two nodes from n to the perimeter such that the the smaller (<180) angle between
+		// them is maximised. We assume point n is outside of the perimeter.
+		e1 = null;
+		e2 = null;
+		max_angle = 0;
+		for (i = 0; i < this.perimeter.length; i++) {
+			if (e1 == null) {
+				e1 = this.perimeter[i];  // first node
+			} else if (e2 == null) {
+				e2 = this.perimeter[i];  // second node
+				max_angle = angle_between(this.graph.getPoint(n),
+				                          this.graph.getPoint(e1),
+				                          this.graph.getPoint(e2));
+			} else {                                  // nth node
+				// new we need to see if our new node gives us a better angle
+				angle = angle_between(this.graph.getPoint(n),
+				                      this.graph.getPoint(this.perimeter[i]),
+				                      this.graph.getPoint(e2));
+				if (angle > max_angle) {
+					max_angle = angle;
+					e1 = this.perimeter[i];
+				}
+				angle = angle_between(this.graph.getPoint(n),
+				                      this.graph.getPoint(this.perimeter[i]),
+				                      this.graph.getPoint(e1));
+				if (angle > max_angle) {
+					max_angle = angle;
+					e2 = this.perimeter[i];
+				}
+			}
+		}
+
+		// e1->n and n->e2 represent links that can be added while keeping
+		// the perimeter convex
+		candidate_edges += (new Edge(e1, n), new Edge(n, e2))
+	}
+
+	edge_pair = this.choose_edges(candidate_edges);
+
+	// To add this edge, we need to add the two edges, but we also might need to fill in the area
+	// that we surrounded.  To do so, we find the shortest path along the perimeter, on the inside,
+	// using "internal edges". This is the minimum number of edges that we can get a away with, and
+	// thus the best solution.
+	
+	a = edge_pair[0].from;
+	b = edge_pair[1].to;
+	l = this.node_to_perim[a].left;
+	r = this.node_to_perim[a].right;
+
+	goright = undefined;
+	// we need to find which way is "inside"
+	sider = side(p(a), p(n), p(r));
+	if (sider !== side(p(a), p(n), p(r))) {
+		goright = (sider === side(p(a), p(n), p(b))) // "r is on inside"
+	} else { // The one with the smallest angle to n is on the inside.
+		goright = (angle_between(p(a), p(n), p(r)) < angle_between(p(a), p(n), p(l))) // "r is 'closer' to n"
+	}
+
+	// We're at a and we need to go through next to b.
+	// Just take every node along the way.
+	// TODO make this a shortest path search for a more optimal solution
+	next = goright ? r : l;
+	path = [a];
+	while (next != b) {
+		path.push(b);
+		if (goright) next = this.node_to_perim[next].right;
+		else         next = this.node_to_perim[next].left;
+	}
+	path.push(b);
+
+	for (i = 0; i < path.length; ++i) {
+		this.edges.push(new Edge(n, path[i]));
+		//internal edges += n → p
+		// Remove nodes from the perim:
+		if (i > 0 && i < path.length-1) { 
+			delete this.node_to_perim[path[i]];
+			//for each internal edge from p, e
+			//	internal edges -= e
+		}
+	}
+	// Add n into the perim.
+	if (goright) {
+		this.node_to_perim[a].right = n;
+		this.node_to_perim[b].left = n;
+	} else {
+		this.node_to_perim[a].left = n;
+		this.node_to_perim[b].right = n;
+	}
+}
+
+
+
+
+
 function Ant(graph, choose_fn) {
 	if (graph) {
 		this.graph = graph;
