@@ -1,3 +1,5 @@
+"use strict";
+
 function Edge(from, to) {
 	this.from = from;
 	this.to = to;
@@ -44,7 +46,7 @@ ShortestPathGraph.prototype.getEdgesFromNode = function(n) {
 }
 
 ShortestPathGraph.prototype.getShortestPath = function() {
-	var i,
+	var i, j, n, e,
 		q = [],
 		visited = [],
 		parents = [],
