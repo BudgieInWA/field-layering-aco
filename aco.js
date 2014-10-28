@@ -643,8 +643,9 @@ ACO.prototype.runIteration = function() {
 				this.setPheromone(e, this.getPheromone(e) + solutions[s].goodness);
 			}
 		} else if ("edges" in solutions[s]) {
-			for (i = 0; i < solutions[s].length; i++) {
-				this.setPheromone(solutions[s].edges[i], this.getPheromone(solutions[s].edges[i]) + solutions[s].goodness);
+			for (i = 0; i < solutions[s].edges.length; i++) {
+				var pher = this.getPheromone(solutions[s].edges[i]);
+				this.setPheromone(solutions[s].edges[i], pher + solutions[s].goodness);
 			}
 		} else { throw new Error("solution has no nodes or edges"); }
 	}
