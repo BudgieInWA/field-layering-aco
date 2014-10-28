@@ -256,7 +256,7 @@ LiteralGraph.prototype.getPoint = function(n) {
 }
 
 LiteralGraph.prototype.heuristic = function(e) {
-	return 20/this.getPoint(e.from).sub(this.getPoint(e.to)).vecLength()
+	return 400/this.getPoint(e.from).sub(this.getPoint(e.to)).vecLength()
 }
 
 function NodeDLL(node, left, right) { // Node Doubly Linked List
@@ -272,7 +272,7 @@ function LiteralAnt(graph, choice_fn) {
 	this.area = 0;
     this.edges = [];
 	this.node_to_perim = {}; // map from node id to NodeDLL in perim
-    //this.internal_edges = {};
+    this.internal_edges = {};
 	this.outside_hull = [];
 	for (i = 0; i < this.graph.size; i++) {
 	   	this.outside_hull.push(true); 
@@ -286,6 +286,11 @@ function LiteralAnt(graph, choice_fn) {
 		4: new NodeDLL(4, 0, 6),
 		6: new NodeDLL(6, 4, 0)
 	};
+	this.internal_edges = {
+		0: {4:4, 6:6},
+		4: {6:6, 0:0},
+		6: {0:0, 4:4}
+	}
 	this.outside_hull[0] = false;
 	this.outside_hull[4] = false;
 	this.outside_hull[6] = false;
@@ -309,6 +314,7 @@ LiteralAnt.prototype.step = function() {
 
 	var n, i, e1, e2, max_angle, u, angle, edge_pair, sider,
 		l, r, a, b, path, next, goright, next, done, node, s, outside,
+		to_visit, q, other, parents, j,
 		candidate_edges = [],
 		this_ = this,
 		p = function(n) { return this_.graph.getPoint(n); };
@@ -327,7 +333,8 @@ LiteralAnt.prototype.step = function() {
 		e1 = null;
 		e2 = null;
 		max_angle = 0;
-		for (u in this.node_to_perim) {
+		for (j in this.node_to_perim) {
+			u = this.node_to_perim[j].node
 			if (e1 == null) {
 				e1 = u; // first node
 			} else if (e2 == null) {
@@ -379,35 +386,75 @@ LiteralAnt.prototype.step = function() {
 	}
 
 	// We're at a and we need to go through next to b.
-	// Just take every node along the way.
-	// TODO make this a shortest path search for a more optimal solution
+	// mark every node along the perim.
 	next = goright ? r : l;
-	path = [a];
+	to_visit = {}
+	var to_remove = {}
 	while (next != b) {
-		path.push(next);
+		to_visit[next] = true;
+		to_remove[next] = next;
 		if (goright) next = this.node_to_perim[next].right;
 		else         next = this.node_to_perim[next].left;
 	}
-	path.push(b);
+	to_visit[b] = true;
+
+	parents = {}
+	q = [a];
+	while (q.length > 0) {
+		u = q.shift();
+		if (u === b) break;
+		for (j in this.internal_edges[u]) {
+			other = this.internal_edges[u][j];
+			if (to_visit[other]) {
+				to_visit[other] = false;
+				parents[other] = u
+				q.push(other);
+			}
+		}
+	}
+	// retrace path
+	path = [];
+	u = b;
+	while (u !== undefined) {
+		path.push(u);
+		u = parents[u];
+	}
 	console.info("\t","path",path);
 
+	// Add edges
 	for (i = 0; i < path.length; ++i) {
 		this.edges.push(new Edge(n, path[i]));
 		//internal edges += n → p
-		// Remove nodes from the perim:
-		if (i > 0 && i < path.length-1) { 
-			delete this.node_to_perim[path[i]];
-			//for each internal edge from p, e
-			//	internal edges -= e
-		}
-
 		if (i > 0) {
 			console.info("\t\t","triangle", path[i], path[i-1], n);
 			this.area += triangleArea(p(path[i]), p(path[i-1]), p(n));
 		}
 	}
+
+	// Remove nodes from the perim:
+	for (i in to_remove) { 
+		next = to_remove[i]
+		console.info("\t", "removing", next);
+		l = this.node_to_perim[next].left;
+		r = this.node_to_perim[next].right;
+		this.node_to_perim[l].right = r;
+		this.node_to_perim[r].left = l;
+		delete this.node_to_perim[next];
+		delete this.internal_edges[next];
+		for (other in this.internal_edges) {
+			delete this.internal_edges[other][next]
+		}
+	}
+
+
 	// Add n into the perim.
+	console.info("\t", "adding node", n, "with", a, b);
 	this.outside_hull[n] = false;
+	this.internal_edges[n] = {};
+	this.internal_edges[n][a] = a;
+	this.internal_edges[a][n] = n;
+	this.internal_edges[n][b] = b;
+	this.internal_edges[b][n] = n;
 	if (goright) {
 		this.node_to_perim[a].right = n;
 		this.node_to_perim[n] = new NodeDLL(n, a, b);
@@ -418,24 +465,24 @@ LiteralAnt.prototype.step = function() {
 		this.node_to_perim[b].right = n;
 	}
 
+
 	// Determine which points are now inside the hull, and if we're done.
 	done = true;
-	for (n = 0; n < this.graph.size; n++) {
-		if (!this.outside_hull[n]) continue;
+	for (i = 0; i < this.graph.size; i++) {
+		if (!this.outside_hull[i]) continue;
 		// If the point is on the same side of each edge as we walk around the perimeter, then it is
 		// on the inside.
-		node = this.edges[0].from; // arbitrary node on perim.
-		a = node;
+		a = n;
 		b = this.node_to_perim[a].left;
-		s = side(p(a), p(b), p(n));
+		s = side(p(a), p(b), p(i));
 		outside = false;
-		while (b != node) {
+		while (b != n) {
 			a = b;
 			b = this.node_to_perim[b].left;
-			if (side(p(a), p(b), p(n)) !== s) outside = true;
+			if (side(p(a), p(b), p(i)) !== s) outside = true;
 		}
 		if (!outside) {
-			this.outside_hull[n] = false;
+			this.outside_hull[i] = false;
 		} else {
 			done = false;
 		}
@@ -472,7 +519,7 @@ function ACO(graph, parameters, ant_type, num_ants) {
 
 function make_default_choice_fn(aco) {
 	return function(edges) {
-		//console.log("choosing between", edges);
+		console.info("choosing between", edges);
 		var roll, i, j, e, pher, heur,
 			total_weight = 0,
 			weights = [];
@@ -480,6 +527,8 @@ function make_default_choice_fn(aco) {
 		for (i = 0; i < edges.length; i++) {
 			e = edges[i];
 			if (e instanceof Array) {
+				pher = 0;
+				heur = 0;
 				for (j = 0; j < e.length; j++) {
 					pher += aco.getPheromone(e[j]);
 					heur += aco.graph.heuristic(e[j]);
@@ -494,9 +543,10 @@ function make_default_choice_fn(aco) {
 			             Math.pow(heur, aco.parameters.beta);
 			total_weight += weights[i];
 		}
-		//console.log("weights", weights);
+		console.info("weights", weights);
 
 		roll = Math.random() * total_weight;
+		console.info("weights", weights, roll);
 		for (i = 0; roll > weights[i]; i++) roll -= weights[i];
 		return edges[i];
 	}
@@ -515,7 +565,10 @@ ACO.prototype.init = function () {
 	}
 
 	this.solutions = {
-		current_best: null
+		global_best: null,
+		iteration_best: null,
+		iteration_goodnesses: [],
+		iteration_pheromones: []
 	}
 }
 
@@ -542,7 +595,9 @@ ACO.prototype.runIteration = function() {
 
 	console.log("Starting iteration");
 	for (i = 0; i < this.num_ants; i++) {
+		console.info("\tant", i);
 		// 1. Generate Ants
+		console.info("");
 		ant = new this.Ant(this.graph, this.choice_fn);
 		//console.log("new ant", ant);
 
@@ -559,18 +614,26 @@ ACO.prototype.runIteration = function() {
 	// 3. Global Update Pheromone.
 	// Evaporation.
 	e = new Edge(0, 0);
+	var m = 0;
 	for (i = 0; i < this.graph.size; i++) {
 		e.from = i;
 		for (j = 0; j < i; j++) {
 			e.to = j;
 			this.setPheromone(e, (1 - p.evaporation_decay) * this.getPheromone(e));
+			m = Math.max(this.getPheromone(e), m);
 		}
 	}
+	this.solutions.iteration_pheromones.push(m);
 	// All ants lay pheromone.
+	this.solutions.iteration_best = null;
 	for (s = 0; s < solutions.length; s++) {
 		if (!this.solutions.global_best ||
 				solutions[s].goodness > this.solutions.global_best.goodness) {
 			this.solutions.global_best = solutions[s];
+		}
+		if (!this.solutions.iteration_best ||
+				solutions[s].goodness > this.solutions.iteration_best.goodness) {
+			this.solutions.iteration_best = solutions[s];
 		}
 		if ("nodes" in solutions[s]) {
 			e = new Edge(-1, solutions[s].nodes[0]);
@@ -585,6 +648,8 @@ ACO.prototype.runIteration = function() {
 			}
 		} else { throw new Error("solution has no nodes or edges"); }
 	}
+
+	this.solutions.iteration_goodnesses.push(this.solutions.iteration_best.goodness);
 }
 
 
@@ -621,7 +686,7 @@ function test_shortest_path_graph() {
 	console.log("bfs", graph.getShortestPath());
 }
 
-var test_point_set = [
+var test_points = [
 	new Point(5, 5),
 	new Point(6, 9),
 	new Point(7,12),
@@ -632,27 +697,43 @@ var test_point_set = [
 	new Point(9, 7)
 ];
 
-function test_literal_graph() {
+function test_literal_graph(num_points) {
 	var i;
-	var graph = new LiteralGraph(test_point_set);
-	//var ant = new LiteralAnt(graph, function(es){return es[0];});
-	var aco = new ACO(graph, {initial_pheromone: 0}, LiteralAnt, 10);
+
+	/*
+	var ant = new LiteralAnt(graph, function(es){return es[0];});
+
+	ant.step();
+	ant.step();
+	console.log(ant)
+	*/
+
+	var points = []
+	for (i = 0; i < num_points; i++) {
+		points.push(new Point(Math.random() * num_points, Math.random() * num_points));
+	}
+	console.log(points);
+	var graph = new LiteralGraph(points);
+	
+	var parameters = {
+		initial_pheromone: 0,
+		alpha: 0.8,
+		beta: 0.3,
+		evaporation_decay: 0.3
+	}
+	var aco = new ACO(graph, parameters, LiteralAnt, 100);
 
 	console.info = function() {}
 
-	for (i = 0; i < 10; i++) {
+	for (i = 0; i < 100; i++) {
 		aco.runIteration();
 	}
 
 	console.log(aco.solutions);
-
 }
 
 function main() {
 	//console.log("doing nothing");
-	test_literal_graph();
+	test_literal_graph(20);
 }
 main();
-
-var o = new Point(0, 0);
-var ps = test_point_set;
