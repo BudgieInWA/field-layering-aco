@@ -67,6 +67,27 @@ function Point(x, y) {
 	this.y = y;
 }
 
+Point.prototype.dot = function(other) {
+	return  this.x * other.x + this.y * other.y;
+}
+Point.prototype.cross = function(other) {
+	return  this.x * other.y - this.y * other.x;
+}
+
+Point.prototype.vecLength = function() {
+	return Math.sqrt(this.x*this.x + this.y*this.y);
+}
+Point.prototype.vecScaled = function(factor) {
+	return new Point(this.x*factor, this.y*factor);
+}
+Point.prototype.vecNormalised = function(factor) {
+	return this.vecScaled(1 / this.vecLength());
+}
+
+Point.prototype.sub = function(other) {
+	return new Point(this.x - other.x, this.y - other.y);
+}
+
 /**
  * Returns which side p is to the of the line l1 -> l2.
  * -1 for left
