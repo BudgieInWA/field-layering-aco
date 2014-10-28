@@ -74,14 +74,26 @@ function Point(x, y) {
  * 1  for right
  */ 
 function side(l1, l2, p) {
-	return 0; //TODO
+	var d = l2.sub(l1).cross( p.sub(l1) );
+	if (d > 0) return  1;
+	if (d < 0) return -1;
+	return 0;
 }
 
 /**
  * Calculates the angle between base -> a and base -> b.
  */ 
-function angle_between(base, a, b) {
-	return 0; //TODO
+Point.prototype.angle_between = function(a, b) {
+	var an = a.sub(this).vecNormalised(),
+		bn = b.sub(this).vecNormalised();
+	return Math.acos(an.dot(bn));
+}
+
+/**
+ * Calculates the area of a triangle.
+ */
+function triangleArea(a, b, c) {
+	return Math.abs(b.sub(a).cross( c.sub(a) )) / 2;
 }
 
 /*****************************************************************************
