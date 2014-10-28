@@ -1,4 +1,7 @@
-"use strict";
+ "use strict";
+/*****************************************************************************
+ * Interfaces                                                                *
+ *****************************************************************************/
 
 function Edge(from, to) {
 	this.from = from;
@@ -18,6 +21,72 @@ Graph.prototype.getEdgesFromNode = function(n) {
 	return [];
 }
 
+function Ant(graph, choose_fn) {
+	if (graph) {
+		this.graph = graph;
+		this.chooseEdge = choose_fn;
+		this.edges = [];
+	}
+}
+
+/**
+ * Take one step towards building a solution.
+ *
+ * This is an example function and should be replaced in subclasses.
+ */
+Ant.prototype.step = function() {
+	var e = this.chooseEdge(graph.getAllEdges());
+	this.edges.push(e);
+	return e;
+}
+
+Ant.prototype.done = function() {
+	return false;
+}
+
+/**
+ * Returns the ants solution.
+ *
+ * This is an example function and should be replaced in sublcasses.
+ */
+Ant.prototype.solution = function () {
+	if (!this.done()) throw new Error("not done");
+
+	return {
+		edges: this.edges,
+		goodness: 0
+	}
+}
+
+/*****************************************************************************
+ * Geometry Stuff                                                            *
+ *****************************************************************************/
+
+function Point(x, y) {
+	this.x = x;
+	this.y = y;
+}
+
+/**
+ * Returns which side p is to the of the line l1 -> l2.
+ * -1 for left
+ * 0  for colinear
+ * 1  for right
+ */ 
+function side(l1, l2, p) {
+	return 0; //TODO
+}
+
+/**
+ * Calculates the angle between base -> a and base -> b.
+ */ 
+function angle_between(base, a, b) {
+	return 0; //TODO
+}
+
+/*****************************************************************************
+ * Shortest Path guys                                                        *
+ *****************************************************************************/
 
 function ShortestPathGraph() {
 	this.source = null;
@@ -81,10 +150,52 @@ ShortestPathGraph.prototype.getShortestPath = function() {
 }
 
 
-function Point(x, y) {
-	this.x = x;
-	this.y = y;
+function ShortestPathAnt(graph, choice_fn) {
+	var i;
+
+	this.Ant = Ant;
+	this.Ant(graph, choice_fn);
+
+	this.current_node = graph.source;
+	this.nodes = [this.current_node];
+	this.visited = [];
+	for (i = 0; i < this.graph.size; i++) {
+		this.visited[i] = false;
+	}
+	this.visited[this.current_node] = true;
 }
+ShortestPathAnt.prototype = new Ant;
+
+ShortestPathAnt.prototype.step = function() {
+	var e, t;
+	t = this;
+	e = this.chooseEdge(this.graph.getEdgesFromNode(this.current_node).filter(
+		function(e){ return !t.visited[e.to]; }
+	));
+	this.current_node = e.to;
+	this.nodes.push(this.current_node);
+	this.visited[this.current_node] = true;
+	return e;
+}
+
+ShortestPathAnt.prototype.done = function() {
+	return this.current_node === this.graph.sink;
+}
+
+ShortestPathAnt.prototype.solution = function () {
+	if (!this.done()) throw new Error("not done");
+
+	return {
+		nodes: this.nodes,
+		goodness: 1 / this.nodes.length
+	}
+}
+
+
+/*****************************************************************************
+ * Literal Construction Graph guys                                           *
+ *****************************************************************************/
+
 function LiteralGraph(points) {
 	var i, j;
 
@@ -107,6 +218,10 @@ LiteralGraph.prototype.getEdgesFromNode = function(n) {
 	return edges[n];
 }
 
+LiteralGraph.prototype.getPoint = function(n) {
+	return this.points[n];
+}
+
 function NodeDLL(node, left, right) { // Node Doubly Linked List
 	this.node = node;
 	this.left = left;
@@ -124,18 +239,46 @@ function LiteralAnt(graph, choice_fn) {
 	for (i = 0; i < this.graph.size; i++) {
 	   	this.outside_hull.push(true); 
 	}
+
+	this.done = false;
+	// Initialise by choosing random starting triangle.
+	this.edges = [new Edge(0,4), new Edge(4,6), new Edge(6,0)];
+	this.node_to_perim = {
+		0: new NodeDLL(0, 6, 4),
+		4: new NodeDLL(4, 0, 6),
+		6: new NodeDLL(6, 4, 0)
+	};
+	this.outside_hull[0] = false;
+	this.outside_hull[4] = false;
+	this.outside_hull[6] = false;
+}
+LiteralAnt.prorotype = new Ant;
+
+LiteralAnt.prototype.done = function() {
+	return this.done;
+}
+
+LiteralAnt.prototype.solution = function() {
+	if (!this.done()) {
+		throw new Error("can't get solution of not done");
+	}
+	return edges;
 }
 
 LiteralAnt.prototype.step = function() {
 	var n, i,
-		l, r, a, b, next, goright, next;
+		l, r, a, b, next, goright, next, done, node, s, outside,
 		candidate_edges = {},
-		p = function(n) { return this.graph.getPoint(n); };
+		this_ = this,
+		p = function(n) { return this_.graph.getPoint(n); };
 
 	// First we need to choose an point to walk to (before promptly walking back to our hull).
 	// We consider each point outside of our hull.
+	done = true;
+	console.info("starting step");
 	for (n = 0; n < this.graph.size; n++) {
 		if (!this.outside_hull[n]) continue;
+		console.info("\t", n);
 
 		// Test if the point is still outside the hull.
 		// If the point is on the same side of each edge as we walk around the perimeter, then it is
@@ -143,7 +286,7 @@ LiteralAnt.prototype.step = function() {
 		node = this.edges[0].from; // arbitrary node on perim.
 		a = node;
 		b = this.node_to_perim[a].left;
-		s = side(p(a), p(b), p(n)));
+		s = side(p(a), p(b), p(n));
 		outside = false;
 		while (b != node) {
 			a = b;
@@ -154,7 +297,9 @@ LiteralAnt.prototype.step = function() {
 			this.outside_hull[n] = false;
 			continue;
 		}
-		
+
+		console.info("\t", "Outside noded", n);
+		done = false;
 
 		// We want to consider visiting this node from our hull then walking straight back,
 		// creating a new convex hull by adding the travelled edges. To do that, we need:
@@ -190,10 +335,15 @@ LiteralAnt.prototype.step = function() {
 			}
 		}
 
+		console.info("\t", "Found edges to", e1, e2);
+
 		// e1->n and n->e2 represent links that can be added while keeping
 		// the perimeter convex
 		candidate_edges += [new Edge(e1, n), new Edge(n, e2)];
 	}
+
+	this.done = done;
+	if (done) return;
 
 	edge_pair = this.chooseEdge(candidate_edges);
 
@@ -253,98 +403,10 @@ LiteralAnt.prototype.step = function() {
 }
 
 
-function LiteralAnt.prototype.done = function() {
-	return this.outsize_hull.length === 0;
-}
 
-function LiteralAnt.prototype.solution = function() {
-	if (!this.done()) {
-		throw new Error("can't get solution of not done");
-	}
-	return edges;
-}
-
-
-
-function Ant(graph, Choose_fn) {
-	if (graph) {
-		this.graph = graph;
-		this.chooseEdge = choose_fn;
-		this.edges = [];
-	}
-}
-
-/**
- * Take one step towards building a solution.
- *
- * This is an example function and should be replaced in subclasses.
- */
-Ant.prototype.step = function() {
-	var e = this.chooseEdge(graph.getAllEdges());
-	this.edges.push(e);
-	return e;
-}
-
-Ant.prototype.done = function() {
-	return false;
-}
-
-/**
- * Returns the ants solution.
- *
- * This is an example function and should be replaced in sublcasses.
- */
-Ant.prototype.solution = function () {
-	if (!this.done()) throw new Error("not done");
-
-	return {
-		edges: this.edges,
-		goodness: 0
-	}
-}
-
-
-function ShortestPathAnt(graph, choice_fn) {
-	var i;
-
-	this.Ant = Ant;
-	this.Ant(graph, choice_fn);
-
-	this.current_node = graph.source;
-	this.nodes = [this.current_node];
-	this.visited = [];
-	for (i = 0; i < this.graph.size; i++) {
-		this.visited[i] = false;
-	}
-	this.visited[this.current_node] = true;
-}
-ShortestPathAnt.prototype = new Ant;
-
-ShortestPathAnt.prototype.step = function() {
-	var e, t;
-	t = this;
-	e = this.chooseEdge(this.graph.getEdgesFromNode(this.current_node).filter(
-		function(e){ return !t.visited[e.to]; }
-	));
-	this.current_node = e.to;
-	this.nodes.push(this.current_node);
-	this.visited[this.current_node] = true;
-	return e;
-}
-
-ShortestPathAnt.prototype.done = function() {
-	return this.current_node === this.graph.sink;
-}
-
-ShortestPathAnt.prototype.solution = function () {
-	if (!this.done()) throw new Error("not done");
-
-	return {
-		nodes: this.nodes,
-		goodness: 1 / this.nodes.length
-	}
-}
-
+/*****************************************************************************
+ * Basic ACO                                                                 *
+ *****************************************************************************/
 
 function ACO(graph, parameters, ant_type, num_ants) {
 	var k;
@@ -479,7 +541,7 @@ ACO.prototype.runIteration = function() {
 }
 
 
-function main() {
+function test_shortest_path_graph() {
 	var ants, iterations, aco, graph, i, adj_list;
 	//   -1-
 	//  /   \
@@ -512,4 +574,27 @@ function main() {
 	console.log("bfs", graph.getShortestPath());
 }
 
+var test_point_set = [
+	new Point(5, 5),
+	new Point(6, 9),
+	new Point(7,12),
+	new Point(8,10),
+	new Point(8, 9),
+	new Point(9, 3),
+	new Point(11,6)
+];
+
+function test_literal_graph() {
+	var graph = new LiteralGraph(test_point_set);
+	console.log(graph);
+	var ant = new LiteralAnt(graph, function(es){return es[0];});
+	console.log(ant);
+	console.log(ant.step());
+	console.log(ant);
+}
+
+function main() {
+	//console.log("doing nothing");
+	test_literal_graph();
+}
 main();
