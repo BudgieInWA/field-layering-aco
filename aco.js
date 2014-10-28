@@ -118,19 +118,17 @@ function LiteralAnt(graph, choice_fn) {
 	this.Ant(graph, choice_fn);
 	
     this.edges = [];
-    this.perimeter = []; // Put NodeDLLs in here
 	this.node_to_perim = {}; // map from node id to NodeDLL in perim
-    this.internal_edges = {};
+    //this.internal_edges = {};
 	this.outside_hull = [];
 	for (i = 0; i < this.graph.size; i++) {
 	   	this.outside_hull.push(true); 
-		this.node_to_perimeter_id[i] = -1;
 	}
 }
 
 LiteralAnt.prototype.step = function() {
 	var n, i,
-		l, r, a, b, next, goright,
+		l, r, a, b, next, goright, next;
 		candidate_edges = {},
 		p = function(n) { return this.graph.getPoint(n); };
 
@@ -372,14 +370,25 @@ function ACO(graph, parameters, ant_type, num_ants) {
 function make_default_choice_fn(aco) {
 	return function(edges) {
 		//console.log("choosing between", edges);
-		var roll, i, e,
+		var roll, i, e, pher, heur,
 			total_weight = 0,
 			weights = [];
 
 		for (i = 0; i < edges.length; i++) {
 			e = edges[i];
-			weights[i] = Math.pow(aco.getPheromone(e), aco.parameters.alpha) + 
-				Math.pow(aco.graph.heuristic(e), aco.parameters.beta);
+			if (e instanceof Array) {
+				for (j = 0; j < e.length; j++) {
+					pher += aco.getPheromone(e[j]);
+					heur += aco.graph.heuristic(e[j]);
+				}
+				pher /= e.length;
+				heur /= e.length;
+			} else {
+				pher = aco.getPheromone(e);
+				heur = aco.graph.heuristic(e);
+			}
+			weights[i] = Math.pow(phem, aco.parameters.alpha) + 
+			             Math.pow(heur, aco.parameters.beta);
 			total_weight += weights[i];
 		}
 		//console.log("weights", weights);
