@@ -138,7 +138,25 @@ LiteralAnt.prototype.step = function() {
 	// We consider each point outside of our hull.
 	for (n = 0; n < this.graph.size; n++) {
 		if (!this.outside_hull[n]) continue;
-		//TODO detect if the point is outside the hull, here or when we change the perimiter.
+
+		// Test if the point is still outside the hull.
+		// If the point is on the same side of each edge as we walk around the perimeter, then it is
+		// on the inside.
+		node = this.edges[0].from; // arbitrary node on perim.
+		a = node;
+		b = this.node_to_perim[a].left;
+		s = side(p(a), p(b), p(n)));
+		outside = false;
+		while (b != node) {
+			a = b;
+			b = this.node_to_perim[b].left;
+			if (side(p(a), p(b), p(n)) !== s) ouside = true;
+		}
+		if (!outside) {
+			this.outside_hull[n] = false;
+			continue;
+		}
+		
 
 		// We want to consider visiting this node from our hull then walking straight back,
 		// creating a new convex hull by adding the travelled edges. To do that, we need:
@@ -176,10 +194,10 @@ LiteralAnt.prototype.step = function() {
 
 		// e1->n and n->e2 represent links that can be added while keeping
 		// the perimeter convex
-		candidate_edges += (new Edge(e1, n), new Edge(n, e2))
+		candidate_edges += [new Edge(e1, n), new Edge(n, e2)];
 	}
 
-	edge_pair = this.choose_edges(candidate_edges);
+	edge_pair = this.chooseEdge(candidate_edges);
 
 	// To add this edge, we need to add the two edges, but we also might need to fill in the area
 	// that we surrounded.  To do so, we find the shortest path along the perimeter, on the inside,
@@ -221,22 +239,36 @@ LiteralAnt.prototype.step = function() {
 			//for each internal edge from p, e
 			//	internal edges -= e
 		}
+
+		// Add triangle i, i-1, n
 	}
 	// Add n into the perim.
 	if (goright) {
 		this.node_to_perim[a].right = n;
+		this.node_to_perim[n] = new NodeDLL(n, a, b);
 		this.node_to_perim[b].left = n;
 	} else {
 		this.node_to_perim[a].left = n;
+		this.node_to_perim[n] = new NodeDLL(n, b, a);
 		this.node_to_perim[b].right = n;
 	}
 }
 
 
+function LiteralAnt.prototype.done = function() {
+	return this.outsize_hull.length === 0;
+}
+
+function LiteralAnt.prototype.solution = function() {
+	if (!this.done()) {
+		throw new Error("can't get solution of not done");
+	}
+	return edges;
+}
 
 
 
-function Ant(graph, choose_fn) {
+function Ant(graph, Choose_fn) {
 	if (graph) {
 		this.graph = graph;
 		this.chooseEdge = choose_fn;
