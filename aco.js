@@ -255,6 +255,10 @@ LiteralGraph.prototype.getPoint = function(n) {
 	return this.points[n];
 }
 
+LiteralGraph.prototype.heuristic = function(e) {
+	return 20/this.getPoint(e.from).sub(this.getPoint(e.to)).vecLength()
+}
+
 function NodeDLL(node, left, right) { // Node Doubly Linked List
 	this.node = node;
 	this.left = left;
@@ -265,6 +269,7 @@ function LiteralAnt(graph, choice_fn) {
 	this.Ant = Ant;
 	this.Ant(graph, choice_fn);
 	
+	this.area = 0;
     this.edges = [];
 	this.node_to_perim = {}; // map from node id to NodeDLL in perim
     //this.internal_edges = {};
@@ -273,7 +278,7 @@ function LiteralAnt(graph, choice_fn) {
 	   	this.outside_hull.push(true); 
 	}
 
-	this.done = false;
+	this.is_done = false;
 	// Initialise by choosing random starting triangle.
 	this.edges = [new Edge(0,4), new Edge(4,6), new Edge(6,0)];
 	this.node_to_perim = {
@@ -284,55 +289,36 @@ function LiteralAnt(graph, choice_fn) {
 	this.outside_hull[0] = false;
 	this.outside_hull[4] = false;
 	this.outside_hull[6] = false;
+	this.area = triangleArea(this.graph.getPoint(0),this.graph.getPoint(4),this.graph.getPoint(6));
 }
 LiteralAnt.prorotype = new Ant;
 
 LiteralAnt.prototype.done = function() {
-	return this.done;
+	return this.is_done;
 }
 
 LiteralAnt.prototype.solution = function() {
 	if (!this.done()) {
 		throw new Error("can't get solution of not done");
 	}
-	return edges;
+	return {edges: this.edges, goodness: this.area};
 }
 
 LiteralAnt.prototype.step = function() {
-	var n, i,
-		l, r, a, b, next, goright, next, done, node, s, outside,
-		candidate_edges = {},
+	if (this.done()) throw new Error("can't step when donw");
+
+	var n, i, e1, e2, max_angle, u, angle, edge_pair, sider,
+		l, r, a, b, path, next, goright, next, done, node, s, outside,
+		candidate_edges = [],
 		this_ = this,
 		p = function(n) { return this_.graph.getPoint(n); };
 
 	// First we need to choose an point to walk to (before promptly walking back to our hull).
 	// We consider each point outside of our hull.
-	done = true;
 	console.info("starting step");
 	for (n = 0; n < this.graph.size; n++) {
 		if (!this.outside_hull[n]) continue;
-		console.info("\t", n);
-
-		// Test if the point is still outside the hull.
-		// If the point is on the same side of each edge as we walk around the perimeter, then it is
-		// on the inside.
-		node = this.edges[0].from; // arbitrary node on perim.
-		a = node;
-		b = this.node_to_perim[a].left;
-		s = side(p(a), p(b), p(n));
-		outside = false;
-		while (b != node) {
-			a = b;
-			b = this.node_to_perim[b].left;
-			if (side(p(a), p(b), p(n)) !== s) ouside = true;
-		}
-		if (!outside) {
-			this.outside_hull[n] = false;
-			continue;
-		}
-
-		console.info("\t", "Outside noded", n);
-		done = false;
+		console.info("\t", "from node", n);
 
 		// We want to consider visiting this node from our hull then walking straight back,
 		// creating a new convex hull by adding the travelled edges. To do that, we need:
@@ -341,29 +327,23 @@ LiteralAnt.prototype.step = function() {
 		e1 = null;
 		e2 = null;
 		max_angle = 0;
-		for (i = 0; i < this.perimeter.length; i++) {
+		for (u in this.node_to_perim) {
 			if (e1 == null) {
-				e1 = this.perimeter[i];  // first node
+				e1 = u; // first node
 			} else if (e2 == null) {
-				e2 = this.perimeter[i];  // second node
-				max_angle = angle_between(this.graph.getPoint(n),
-				                          this.graph.getPoint(e1),
-				                          this.graph.getPoint(e2));
-			} else {                                  // nth node
+				e2 = u; // second node
+				max_angle = this.graph.getPoint(n).angle_between(this.graph.getPoint(e1), this.graph.getPoint(e2));
+			} else {    // nth node
 				// new we need to see if our new node gives us a better angle
-				angle = angle_between(this.graph.getPoint(n),
-				                      this.graph.getPoint(this.perimeter[i]),
-				                      this.graph.getPoint(e2));
+				angle = this.graph.getPoint(n).angle_between(this.graph.getPoint(u), this.graph.getPoint(e2));
 				if (angle > max_angle) {
 					max_angle = angle;
-					e1 = this.perimeter[i];
+					e1 = u;
 				}
-				angle = angle_between(this.graph.getPoint(n),
-				                      this.graph.getPoint(this.perimeter[i]),
-				                      this.graph.getPoint(e1));
+				angle = this.graph.getPoint(n).angle_between(this.graph.getPoint(u), this.graph.getPoint(e1));
 				if (angle > max_angle) {
 					max_angle = angle;
-					e2 = this.perimeter[i];
+					e2 = u;
 				}
 			}
 		}
@@ -372,13 +352,11 @@ LiteralAnt.prototype.step = function() {
 
 		// e1->n and n->e2 represent links that can be added while keeping
 		// the perimeter convex
-		candidate_edges += [new Edge(e1, n), new Edge(n, e2)];
+		candidate_edges.push([new Edge(e1, n), new Edge(n, e2)]);
 	}
 
-	this.done = done;
-	if (done) return;
-
 	edge_pair = this.chooseEdge(candidate_edges);
+	console.info("\tchosen pair", edge_pair);
 
 	// To add this edge, we need to add the two edges, but we also might need to fill in the area
 	// that we surrounded.  To do so, we find the shortest path along the perimeter, on the inside,
@@ -386,6 +364,7 @@ LiteralAnt.prototype.step = function() {
 	// thus the best solution.
 	
 	a = edge_pair[0].from;
+	n = edge_pair[0].to;
 	b = edge_pair[1].to;
 	l = this.node_to_perim[a].left;
 	r = this.node_to_perim[a].right;
@@ -396,7 +375,7 @@ LiteralAnt.prototype.step = function() {
 	if (sider !== side(p(a), p(n), p(r))) {
 		goright = (sider === side(p(a), p(n), p(b))) // "r is on inside"
 	} else { // The one with the smallest angle to n is on the inside.
-		goright = (angle_between(p(a), p(n), p(r)) < angle_between(p(a), p(n), p(l))) // "r is 'closer' to n"
+		goright = (p(a).angle_between(p(n), p(r)) < p(a).angle_between(p(n), p(l))) // "r is 'closer' to n"
 	}
 
 	// We're at a and we need to go through next to b.
@@ -405,11 +384,12 @@ LiteralAnt.prototype.step = function() {
 	next = goright ? r : l;
 	path = [a];
 	while (next != b) {
-		path.push(b);
+		path.push(next);
 		if (goright) next = this.node_to_perim[next].right;
 		else         next = this.node_to_perim[next].left;
 	}
 	path.push(b);
+	console.info("\t","path",path);
 
 	for (i = 0; i < path.length; ++i) {
 		this.edges.push(new Edge(n, path[i]));
@@ -421,9 +401,13 @@ LiteralAnt.prototype.step = function() {
 			//	internal edges -= e
 		}
 
-		// Add triangle i, i-1, n
+		if (i > 0) {
+			console.info("\t\t","triangle", path[i], path[i-1], n);
+			this.area += triangleArea(p(path[i]), p(path[i-1]), p(n));
+		}
 	}
 	// Add n into the perim.
+	this.outside_hull[n] = false;
 	if (goright) {
 		this.node_to_perim[a].right = n;
 		this.node_to_perim[n] = new NodeDLL(n, a, b);
@@ -433,6 +417,30 @@ LiteralAnt.prototype.step = function() {
 		this.node_to_perim[n] = new NodeDLL(n, b, a);
 		this.node_to_perim[b].right = n;
 	}
+
+	// Determine which points are now inside the hull, and if we're done.
+	done = true;
+	for (n = 0; n < this.graph.size; n++) {
+		if (!this.outside_hull[n]) continue;
+		// If the point is on the same side of each edge as we walk around the perimeter, then it is
+		// on the inside.
+		node = this.edges[0].from; // arbitrary node on perim.
+		a = node;
+		b = this.node_to_perim[a].left;
+		s = side(p(a), p(b), p(n));
+		outside = false;
+		while (b != node) {
+			a = b;
+			b = this.node_to_perim[b].left;
+			if (side(p(a), p(b), p(n)) !== s) outside = true;
+		}
+		if (!outside) {
+			this.outside_hull[n] = false;
+		} else {
+			done = false;
+		}
+	}
+	this.is_done = done;
 }
 
 
@@ -465,7 +473,7 @@ function ACO(graph, parameters, ant_type, num_ants) {
 function make_default_choice_fn(aco) {
 	return function(edges) {
 		//console.log("choosing between", edges);
-		var roll, i, e, pher, heur,
+		var roll, i, j, e, pher, heur,
 			total_weight = 0,
 			weights = [];
 
@@ -482,7 +490,7 @@ function make_default_choice_fn(aco) {
 				pher = aco.getPheromone(e);
 				heur = aco.graph.heuristic(e);
 			}
-			weights[i] = Math.pow(phem, aco.parameters.alpha) + 
+			weights[i] = Math.pow(pher, aco.parameters.alpha) + 
 			             Math.pow(heur, aco.parameters.beta);
 			total_weight += weights[i];
 		}
@@ -546,7 +554,7 @@ ACO.prototype.runIteration = function() {
 		//console.log("ant done", ant);
 		solutions.push(ant.solution());
 	}
-	console.log("solutions", solutions);
+	console.info("solutions", solutions);
 
 	// 3. Global Update Pheromone.
 	// Evaporation.
@@ -564,12 +572,18 @@ ACO.prototype.runIteration = function() {
 				solutions[s].goodness > this.solutions.global_best.goodness) {
 			this.solutions.global_best = solutions[s];
 		}
-		e = new Edge(-1, solutions[s].nodes[0]);
-		for (i = 1; i < solutions[s].nodes.length; i++) {
-			e.from = e.to;
-			e.to = solutions[s].nodes[i];
-			this.setPheromone(e, this.getPheromone(e) + solutions[s].goodness);
-		}
+		if ("nodes" in solutions[s]) {
+			e = new Edge(-1, solutions[s].nodes[0]);
+			for (i = 1; i < solutions[s].nodes.length; i++) {
+				e.from = e.to;
+				e.to = solutions[s].nodes[i];
+				this.setPheromone(e, this.getPheromone(e) + solutions[s].goodness);
+			}
+		} else if ("edges" in solutions[s]) {
+			for (i = 0; i < solutions[s].length; i++) {
+				this.setPheromone(solutions[s].edges[i], this.getPheromone(solutions[s].edges[i]) + solutions[s].goodness);
+			}
+		} else { throw new Error("solution has no nodes or edges"); }
 	}
 }
 
@@ -614,16 +628,24 @@ var test_point_set = [
 	new Point(8,10),
 	new Point(8, 9),
 	new Point(9, 3),
-	new Point(11,6)
+	new Point(11,6),
+	new Point(9, 7)
 ];
 
 function test_literal_graph() {
+	var i;
 	var graph = new LiteralGraph(test_point_set);
-	console.log(graph);
-	var ant = new LiteralAnt(graph, function(es){return es[0];});
-	console.log(ant);
-	console.log(ant.step());
-	console.log(ant);
+	//var ant = new LiteralAnt(graph, function(es){return es[0];});
+	var aco = new ACO(graph, {initial_pheromone: 0}, LiteralAnt, 10);
+
+	console.info = function() {}
+
+	for (i = 0; i < 10; i++) {
+		aco.runIteration();
+	}
+
+	console.log(aco.solutions);
+
 }
 
 function main() {
@@ -631,3 +653,6 @@ function main() {
 	test_literal_graph();
 }
 main();
+
+var o = new Point(0, 0);
+var ps = test_point_set;
