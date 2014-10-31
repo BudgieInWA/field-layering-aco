@@ -523,7 +523,7 @@ SpiderAntGraph.prototype.getPoint = function(n) {
 
 SpiderAntGraph.prototype.heuristic = function(e) {
 	//TODO
-	return 400/this.getPoint(e.from).sub(this.getPoint(e.to)).vecLength()
+	return 10 / this.getPoint(e.from).sub(this.getPoint(e.to)).vecLength()
 }
 
 function SpiderAnt(graph, choice_fn) {
@@ -539,7 +539,7 @@ function SpiderAnt(graph, choice_fn) {
 	this.is_done = false;
 
 	// Initialise by choosing random starting triangle.
-	this.current_nodes = [0, 4, 3];
+	this.current_nodes = [0, 4, 6];
 	this.area = triangleArea(this.graph.getPoint(0),this.graph.getPoint(4),this.graph.getPoint(6));
 }
 SpiderAnt.prorotype = new Ant;
@@ -552,7 +552,7 @@ SpiderAnt.prototype.solution = function() {
 	if (!this.done()) {
 		throw new Error("can't get solution of not done");
 	}
-	return {edges: this.edges, goodness: this.area};
+	return {edges: this.construction_edges, goodness: this.area};
 }
 
 SpiderAnt.prototype.step = function() {
@@ -575,7 +575,7 @@ SpiderAnt.prototype.step = function() {
 		for (j = 0; j < perms.length; j++) {
 			perm = perms[j];
 			// Find out if the portal is on the "inside".
-			side1 = side(p(perm[0]), p(perm[1]), p(perm[2])); //TODO bring this outside portalLoop to make things faster.
+			side1 = side(p(perm[0]), p(perm[1]), p(ns[perm[2]])); //TODO bring this outside portalLoop to make things faster.
 			side2 = side(p(perm[0]), p(perm[1]), p(n));
 			if (side2 == 0) continue new_node; // Colinear portals should not be considered.
 			if (side1 == side2) {
@@ -671,9 +671,9 @@ ACO.prototype.init = function () {
 
 	this.solutions = {
 		global_best: null,
-		iteration_best: null,
-		iteration_goodnesses: [],
-		iteration_pheromones: []
+		generation_best: null,
+		generation_goodnesses: [],
+		generation_pheromones: []
 	}
 }
 
@@ -693,12 +693,12 @@ ACO.prototype.getBestSolution = function() {
 	return this.solutions.global_best;
 }
 
-ACO.prototype.runIteration = function() {
+ACO.prototype.runGeneration = function() {
 	var i, j, e, s, ant, edge,
 	   	p = this.parameters,
 	   	solutions = [];
 
-	console.log("Starting iteration");
+	console.log("Starting generation");
 	for (i = 0; i < this.num_ants; i++) {
 		console.info("\tant", i);
 		// 1. Generate Ants
@@ -728,17 +728,17 @@ ACO.prototype.runIteration = function() {
 			m = Math.max(this.getPheromone(e), m);
 		}
 	}
-	this.solutions.iteration_pheromones.push(m);
+	this.solutions.generation_pheromones.push(m);
 	// All ants lay pheromone.
-	this.solutions.iteration_best = null;
+	this.solutions.generation_best = null;
 	for (s = 0; s < solutions.length; s++) {
 		if (!this.solutions.global_best ||
 				solutions[s].goodness > this.solutions.global_best.goodness) {
 			this.solutions.global_best = solutions[s];
 		}
-		if (!this.solutions.iteration_best ||
-				solutions[s].goodness > this.solutions.iteration_best.goodness) {
-			this.solutions.iteration_best = solutions[s];
+		if (!this.solutions.generation_best ||
+				solutions[s].goodness > this.solutions.generation_best.goodness) {
+			this.solutions.generation_best = solutions[s];
 		}
 		if ("nodes" in solutions[s]) {
 			e = new Edge(-1, solutions[s].nodes[0]);
@@ -755,12 +755,12 @@ ACO.prototype.runIteration = function() {
 		} else { throw new Error("solution has no nodes or edges"); }
 	}
 
-	this.solutions.iteration_goodnesses.push(this.solutions.iteration_best.goodness);
+	this.solutions.generation_goodnesses.push(this.solutions.generation_best.goodness);
 }
 
 
 function test_shortest_path_graph() {
-	var ants, iterations, aco, graph, i, adj_list;
+	var ants, generations, aco, graph, i, adj_list;
 	//   -1-
 	//  /   \
 	//  0    4
@@ -779,12 +779,12 @@ function test_shortest_path_graph() {
 	console.log("Graph", graph);
 
 	ants = 10;
-	iterations = 10;
+	generations = 10;
 
 	aco = new ACO(graph, {}, ShortestPathAnt, ants);
 	console.log("ACO", aco);
-	for (i = 0; i < iterations; i++) {
-		aco.runIteration();
+	for (i = 0; i < generations; i++) {
+		aco.runGeneration();
 		console.log("pheromone", aco.pheromone);
 		console.log("best so far", aco.getBestSolution());
 	}
@@ -827,7 +827,7 @@ function test_literal_graph(num_points) {
 	console.info = function() {}
 
 	for (i = 0; i < 100; i++) {
-		aco.runIteration();
+		aco.runGeneration();
 	}
 
 	console.log(aco.solutions);
@@ -845,8 +845,8 @@ var program = require('commander');
 program
 	.version('0.1.0')
 	.option('-a, --num-ants <count>', "Number of ants", 10)
-	.option('-i, --num-iterations <count>', "Number of ants", 10)
-	.option('-r, --random-portals <count>', "Number of portals (points) when generating random data")
+	.option('-g, --num-generations <count>', "Number of generations", 10)
+	.option('-r, --random-points <count>', "Use <count> randomly generated points", 10)
 	.option('-p, --points [file]', "Load portals (points) from the specified file or stdin");
 
 program
@@ -896,8 +896,8 @@ program
 		graph = new LiteralGraph(points);
 		aco = new ACOVarient(graph, {}, LiteralAnt, program.numAnts);
 		console.log(aco);
-		for (i = 0; i < program.numIterations; i++) {
-			aco.runIteration();
+		for (i = 0; i < program.numGenerations; i++) {
+			aco.runGeneration();
 		}
 		console.log(aco.solutions)
 	})
