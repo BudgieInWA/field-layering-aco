@@ -814,11 +814,6 @@ function test_literal_graph(num_points) {
 	console.log(ant)
 	*/
 
-	var points = []
-	for (i = 0; i < num_points; i++) {
-		points.push(new Point(Math.random() * num_points, Math.random() * num_points));
-	}
-	console.log(points);
 	var graph = new LiteralGraph(points);
 	
 	var parameters = {
@@ -838,8 +833,73 @@ function test_literal_graph(num_points) {
 	console.log(aco.solutions);
 }
 
-function main() {
-	//console.log("doing nothing");
-	test_literal_graph(20);
+function random_points(num_points) {
+	var points = [];
+	for (i = 0; i < num_points; i++) {
+		points.push(new Point(Math.random() * num_points, Math.random() * num_points));
+	}
+	return points;
 }
-main();
+
+var program = require('commander');
+program
+	.version('0.1.0')
+	.option('-a, --num-ants <count>', "Number of ants", 10)
+	.option('-i, --num-iterations <count>', "Number of ants", 10)
+	.option('-r, --random-portals <count>', "Number of portals (points) when generating random data")
+	.option('-p, --points [file]', "Load portals (points) from the specified file or stdin");
+
+program
+	.command('run <construction> [aco]')
+	.description("Run the given construction using the given ACO")
+	.action(function(construction, algo){
+		var GraphVarient, graph, AntVarient, ACOVarient, aco, points,
+			i;
+
+		switch (algo) {
+			case undefined:
+			case 'aco':
+				ACOVarient = ACO;
+			break;
+			default:
+				throw new Error("unknown ACO varient '"+algo+"'")
+		}
+
+
+		points = test_points;
+		if (program.randomPortals) {
+			points = random_points(program.randomPortals);
+		} if (program.points === true) {
+			//TODO read points from stdin
+			throw new Error("not yet implemented");
+		} else if (program.points !== undefined) {
+			//TODO read points from file
+			throw new Error("not yet implemented");
+		}
+
+		switch(construction) {
+			case 'path': 
+				graph = new ShortestPathGraph(); // TODO populate graph
+			break;
+			case 'literal':
+				GraphVarient = LiteralGraph;
+				AntVarient = LiteralAnt;
+			break;
+			case 'spider':
+				GraphVarient = SpiderAntGraph;
+				AntVarient = SpiderAnt;
+			break;
+			default:
+				throw new Error("Unknown construction '"+construction+"'");
+		}	
+
+		graph = new LiteralGraph(points);
+		aco = new ACOVarient(graph, {}, LiteralAnt, program.numAnts);
+		console.log(aco);
+		for (i = 0; i < program.numIterations; i++) {
+			aco.runIteration();
+		}
+		console.log(aco.solutions)
+	})
+
+program.parse(process.argv)
