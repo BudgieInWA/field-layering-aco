@@ -491,6 +491,111 @@ LiteralAnt.prototype.step = function() {
 }
 
 
+/*****************************************************************************
+ * Spider Ant                                                                *
+ *****************************************************************************/
+
+function SpiderAntGraph(points) {
+	var i, j;
+
+	this.size = points.length;
+	this.points = points;
+
+	this.edges = [];
+	for (i = 0; i < this.size; i++) {
+		this.edges.push([]);
+		for (j = 0; j < this.size; j++) {
+			if (i != j) {
+				this.edges[i].push(new Edge(i, j));
+			}
+		}
+	}
+}
+SpiderAntGraph.prototype = new Graph;
+
+SpiderAntGraph.prototype.getEdgesFromNode = function(n) {
+	return edges[n];
+}
+
+SpiderAntGraph.prototype.getPoint = function(n) {
+	return this.points[n];
+}
+
+SpiderAntGraph.prototype.heuristic = function(e) {
+	//TODO
+	return 400/this.getPoint(e.from).sub(this.getPoint(e.to)).vecLength()
+}
+
+function SpiderAnt(graph, choice_fn) {
+	var i;
+	this.Ant = Ant;
+	this.Ant(graph, choice_fn);
+	
+	this.area = 0;
+    this.construction_edges = [];
+
+	this.current_nodes = [];
+
+	this.is_done = false;
+
+	// Initialise by choosing random starting triangle.
+	this.current_nodes = [0, 4, 3];
+	this.area = triangleArea(this.graph.getPoint(0),this.graph.getPoint(4),this.graph.getPoint(6));
+}
+SpiderAnt.prorotype = new Ant;
+
+SpiderAnt.prototype.done = function() {
+	return this.is_done;
+}
+
+SpiderAnt.prototype.solution = function() {
+	if (!this.done()) {
+		throw new Error("can't get solution of not done");
+	}
+	return {edges: this.edges, goodness: this.area};
+}
+
+SpiderAnt.prototype.step = function() {
+	var i, j, perm, perms, side1, side2, new_node, new_edge, old_node_i,
+		ns = this.current_nodes;
+
+	new_node:
+	for (n = 0; n < this.graph.size; n++) {
+
+		// The portal can't be one of the current portals.
+		//TODO keep track of which portals are already invalid?
+		if (n == ns[0] || n == ns[1] || n == ns[2]) continue;
+
+		// The portal can be on the "inside" (the same side as the field) of exactly one edge.
+		// If that is the case, the one such edge will be the base of the next layer.
+		old_node_i = null;
+		perms = [[ns[0], ns[1], 2],  // The three edges we need to test,
+		         [ns[1], ns[2], 0],  // 3rd entry is index of replaced node.
+		         [ns[2], ns[0], 1]];
+		for (j = 0; j < perms.length; j++) {
+			perm = perms[j];
+			// Find out if the portal is on the "inside".
+			side1 = side(p(perm[0]), p(perm[1]), p(perm[2])); //TODO bring this outside portalLoop to make things faster.
+			side2 = side(p(perm[0]), p(perm[1]), p(n));
+			if (side2 == 0) continue new_node; // Colinear portals should not be considered.
+			if (side1 == side2) {
+				if (old_node_i === null) { // First "inside" portal.
+					old_node_i = perm[2];
+				} else { // Second "inside" portal (i.e. n is invalid).
+					continue new_node;
+				}
+			}
+		}
+
+		candidate_edges.push(new Edge(ns[old_node_i], n));
+	}
+
+	new_edge = this.choose_edge(candidate_edges);
+	ns[old_edge_i] = new_edge.to;
+	this.area += triangleArea(ns[0], ns[1], ns[2]);
+	this.construction_edges.push(new_edge);
+}
+
 
 /*****************************************************************************
  * Basic ACO                                                                 *
