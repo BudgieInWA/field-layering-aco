@@ -5,8 +5,6 @@ def main(script, fn, *args):
     with open(fn, 'r') as f:
         stats = json.loads(f.read())
 
-        print (stats)
-
         for key in stats:
             plot.figure(key)
             plot.title(key)
