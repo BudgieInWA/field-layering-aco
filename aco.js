@@ -127,8 +127,8 @@ function ShortestPathGraph(points) {
 	this.points = points;
 	this.size = points.length;
 	
-	this.source = null;
-	this.sink = null;
+	this.source = 0;
+	this.sink = 1;
 	this.edges = [];
 
 	// set up edges
@@ -162,8 +162,13 @@ ShortestPathGraph.prototype.getEdgesFromNode = function(n) {
 	return this.edges[n];
 }
 
+ShortestPathGraph.prototype.getPoint = function(n) {
+	return this.points[n];
+}
+
 ShortestPathGraph.prototype.getCost = function(e) {
-	return e.from.sub(e.to).vecLength();
+	var x = this.getPoint(e.from).sub(this.getPoint(e.to)).vecLength();
+	return x;
 }
 
 ShortestPathGraph.prototype.getShortestPath = function() {
@@ -208,7 +213,7 @@ function ShortestPathAnt(graph, choice_fn) {
 	this.Ant = Ant;
 	this.Ant(graph, choice_fn);
 
-	this.length = 0;
+	this.cost = 0;
 	this.current_node = graph.source;
 	this.nodes = [this.current_node];
 	this.visited = [];
@@ -241,7 +246,7 @@ ShortestPathAnt.prototype.solution = function () {
 
 	return {
 		nodes: this.nodes,
-		goodness: 1 / this.nodes.length
+		goodness: 1 / this.cost
 	}
 }
 
@@ -792,9 +797,9 @@ ACO.prototype.runGeneration = function() {
 	this.globalUpdatePheromone(solutions);
 
 	// modify alpha and beta
-	if (this.parameters.beta > 0.01) {
-		this.parameters.beta -= 0.01;
-	}
+	//if (this.parameters.beta > 0.01) {
+//		this.parameters.beta -= 0.01;
+//	}
 }
 
 ACO.prototype.globalUpdatePheromone = function(solutions) {
