@@ -121,10 +121,25 @@ function triangleArea(a, b, c) {
  * Shortest Path guys                                                        *
  *****************************************************************************/
 
-function ShortestPathGraph() {
+function ShortestPathGraph(points) {
+	var i, j;
+
+	this.points = points;
+	this.size = points.length;
+	
 	this.source = null;
 	this.sink = null;
 	this.edges = [];
+
+	// set up edges
+	for (i = 0; i < this.size; i++) this.edges.push([]);
+	for (i = 0; i < this.size; i++) {
+		for (j = 0; j < this.size; j++) {
+			if (i == j) continue;
+			this.edges[i].push(new Edge(i, j));
+		}
+	}
+
 }
 ShortestPathGraph.prototype = new Graph;
 
@@ -145,6 +160,10 @@ ShortestPathGraph.prototype.withEdgesFromHalfAdjList = function (adjacency_list)
 
 ShortestPathGraph.prototype.getEdgesFromNode = function(n) {
 	return this.edges[n];
+}
+
+ShortestPathGraph.prototype.getCost = function(e) {
+	return e.from.sub(e.to).vecLength();
 }
 
 ShortestPathGraph.prototype.getShortestPath = function() {
@@ -189,6 +208,7 @@ function ShortestPathAnt(graph, choice_fn) {
 	this.Ant = Ant;
 	this.Ant(graph, choice_fn);
 
+	this.length = 0;
 	this.current_node = graph.source;
 	this.nodes = [this.current_node];
 	this.visited = [];
@@ -208,6 +228,7 @@ ShortestPathAnt.prototype.step = function() {
 	this.current_node = e.to;
 	this.nodes.push(this.current_node);
 	this.visited[this.current_node] = true;
+	this.cost += this.graph.getCost(e);
 	return e;
 }
 
@@ -230,7 +251,7 @@ ShortestPathAnt.prototype.solution = function () {
  *****************************************************************************/
 
 function LiteralGraph(points) {
-	var i, j;
+	var i, j, maxx = 0, minx = 1234567890;
 
 	this.size = points.length;
 	this.points = points;
@@ -244,6 +265,14 @@ function LiteralGraph(points) {
 			}
 		}
 	}
+
+	for (i = 0; i < this.size; i++) {
+		minx = Math.min(minx, points[i].x);
+		maxx = Math.max(maxx, points[i].x);
+	}
+
+	this.heuristic_scale = (maxx - minx);
+	console.log(this.heuristic_scale);
 }
 LiteralGraph.prototype = new Graph;
 
@@ -256,7 +285,7 @@ LiteralGraph.prototype.getPoint = function(n) {
 }
 
 LiteralGraph.prototype.heuristic = function(e) {
-	return 400/this.getPoint(e.from).sub(this.getPoint(e.to)).vecLength()
+	return this.heuristic_scale/this.getPoint(e.from).sub(this.getPoint(e.to)).vecLength()
 }
 
 function NodeDLL(node, left, right) { // Node Doubly Linked List
@@ -556,8 +585,11 @@ SpiderAnt.prototype.solution = function() {
 }
 
 SpiderAnt.prototype.step = function() {
-	var i, j, perm, perms, side1, side2, new_node, new_edge, old_node_i,
-		ns = this.current_nodes;
+	var i, j, n, perm, perms, side1, side2, new_node, new_edge, old_node_i,
+		candidate_edges = [],
+		ns = this.current_nodes,
+		this_ = this,
+		p = function(n) { return this_.graph.getPoint(n); };
 
 	new_node:
 	for (n = 0; n < this.graph.size; n++) {
@@ -590,9 +622,9 @@ SpiderAnt.prototype.step = function() {
 		candidate_edges.push(new Edge(ns[old_node_i], n));
 	}
 
-	new_edge = this.choose_edge(candidate_edges);
-	ns[old_edge_i] = new_edge.to;
-	this.area += triangleArea(ns[0], ns[1], ns[2]);
+	new_edge = this.chooseEdge(candidate_edges);
+	ns[old_node_i] = new_edge.to;
+	this.area += triangleArea(p(ns[0]), p(ns[1]), p(ns[2]));
 	this.construction_edges.push(new_edge);
 }
 
@@ -602,6 +634,8 @@ SpiderAnt.prototype.step = function() {
  *****************************************************************************/
 
 function ACO(graph, parameters, ant_type, num_ants) {
+	if (graph === undefined) return;
+
 	var k;
 
 	// Save parameters.
@@ -673,8 +707,12 @@ ACO.prototype.init = function () {
 		global_best: null,
 		generation_best: null,
 		generation_goodnesses: [],
-		generation_pheromones: []
+		generation_global_best: [],
+		generation_pheromones: [],
+		generation_average_pheromones: []
 	}
+
+	this.generation = 1;
 }
 
 ACO.prototype.getPheromone = function(e) {
@@ -698,7 +736,8 @@ ACO.prototype.runGeneration = function() {
 	   	p = this.parameters,
 	   	solutions = [];
 
-	console.log("Starting generation");
+	console.log("Starting generation", this.generation);
+	this.generation += 1;
 	for (i = 0; i < this.num_ants; i++) {
 		console.info("\tant", i);
 		// 1. Generate Ants
@@ -718,6 +757,8 @@ ACO.prototype.runGeneration = function() {
 
 	// 3. Global Update Pheromone.
 	// Evaporation.
+	var total_pher = 0;
+	var pher_count = 0;
 	e = new Edge(0, 0);
 	var m = 0;
 	for (i = 0; i < this.graph.size; i++) {
@@ -726,10 +767,14 @@ ACO.prototype.runGeneration = function() {
 			e.to = j;
 			this.setPheromone(e, (1 - p.evaporation_decay) * this.getPheromone(e));
 			m = Math.max(this.getPheromone(e), m);
+			total_pher += this.getPheromone(e);
+			pher_count += 1;
 		}
 	}
 	this.solutions.generation_pheromones.push(m);
-	// All ants lay pheromone.
+	this.solutions.generation_average_pheromones.push(total_pher / pher_count);
+
+	//Calculate some stats.
 	this.solutions.generation_best = null;
 	for (s = 0; s < solutions.length; s++) {
 		if (!this.solutions.global_best ||
@@ -740,6 +785,24 @@ ACO.prototype.runGeneration = function() {
 				solutions[s].goodness > this.solutions.generation_best.goodness) {
 			this.solutions.generation_best = solutions[s];
 		}
+	}
+	this.solutions.generation_goodnesses.push(this.solutions.generation_best.goodness);
+	this.solutions.generation_global_best.push(this.solutions.global_best.goodness);
+
+	this.globalUpdatePheromone(solutions);
+
+	// modify alpha and beta
+	if (this.parameters.beta > 0.01) {
+		this.parameters.beta -= 0.01;
+	}
+}
+
+ACO.prototype.globalUpdatePheromone = function(solutions) {
+	var s, e, i;
+
+	// All ants lay pheromone.
+	this.solutions.generation_best = null;
+	for (s = 0; s < solutions.length; s++) {
 		if ("nodes" in solutions[s]) {
 			e = new Edge(-1, solutions[s].nodes[0]);
 			for (i = 1; i < solutions[s].nodes.length; i++) {
@@ -754,9 +817,44 @@ ACO.prototype.runGeneration = function() {
 			}
 		} else { throw new Error("solution has no nodes or edges"); }
 	}
-
-	this.solutions.generation_goodnesses.push(this.solutions.generation_best.goodness);
 }
+
+/*****************************************************************************
+ * Elitist ACO                                                               *
+ *****************************************************************************/
+
+function ElitistACO(graph, parameters, ant_type, num_ants) {
+	this.ACO = ACO;
+	this.ACO(graph, parameters, ant_type, num_ants);
+}
+ElitistACO.prototype = new ACO;
+
+/**
+ * Best n ants lay pheromone.
+ */
+ElitistACO.prototype.globalUpdatePheromone = function(solutions) {
+	var s, e, i, N = 2;
+
+	solutions.sort(function(a,b) {return b.goodness-a.goodness;});
+	console.info(solutions)
+	for (s = 0; s < N; s++) {
+		console.log(s, "goodness", solutions[s].goodness);
+		if ("nodes" in solutions[s]) {
+			e = new Edge(-1, solutions[s].nodes[0]);
+			for (i = 1; i < solutions[s].nodes.length; i++) {
+				e.from = e.to;
+				e.to = solutions[s].nodes[i];
+				this.setPheromone(e, this.getPheromone(e) + 1/(1+s));
+			}
+		} else if ("edges" in solutions[s]) {
+			for (i = 0; i < solutions[s].edges.length; i++) {
+				var pher = this.getPheromone(solutions[s].edges[i]);
+				this.setPheromone(solutions[s].edges[i], pher + 1/(1+s));
+			}
+		} else { throw new Error("solution has no nodes or edges"); }
+	}
+}
+
 
 /*****************************************************************************
  * Deterministic Algo                                                        *
@@ -895,42 +993,6 @@ function computeOptimalSingleTriangleLayering(thePortals) {
 
 
 
-
-
-function test_shortest_path_graph() {
-	var ants, generations, aco, graph, i, adj_list;
-	//   -1-
-	//  /   \
-	//  0    4
-	//  \   /
-	//   2-3
-	adj_list = [
-			[1, 2], // 0
-			[4],    // 1
-			[3],    // 2
-			[4],    // 3
-			[],     // 4
-		];
-	graph = new ShortestPathGraph().withEdgesFromHalfAdjList(adj_list);
-	graph.source = 0;
-	graph.sink = 4;
-	console.log("Graph", graph);
-
-	ants = 10;
-	generations = 10;
-
-	aco = new ACO(graph, {}, ShortestPathAnt, ants);
-	console.log("ACO", aco);
-	for (i = 0; i < generations; i++) {
-		aco.runGeneration();
-		console.log("pheromone", aco.pheromone);
-		console.log("best so far", aco.getBestSolution());
-	}
-
-	console.log("bfs", graph.getShortestPath());
-}
-
-
 /*****************************************************************************
  * Testing                                                                   *
  *****************************************************************************/
@@ -965,7 +1027,8 @@ program
 	.option('-g, --num-generations <count>', "Number of generations", 10)
 	.option('-r, --random-points <count>', "Use <count> randomly generated points", 10)
 	.option('-l, --log-file <file>', "Write stats to <file>")
-	.option('-p, --points [file]', "Load portals (points) from the specified file or stdin");
+	.option('-p, --points [file]', "Load portals (points) from the specified file or stdin")
+	.option('-v, --verbose', "Be verbose");
 
 program
 	.command('run <construction> [aco]')
@@ -978,6 +1041,9 @@ program
 			case undefined:
 			case 'aco':
 				ACOVarient = ACO;
+			break;
+			case 'elitist':
+				ACOVarient = ElitistACO;
 			break;
 			default:
 				throw new Error("unknown ACO varient '"+algo+"'")
@@ -997,13 +1063,17 @@ program
 
 		switch(construction) {
 			case 'path': 
-				graph = new ShortestPathGraph(); // TODO populate graph
+				console.log("shortest path ants, coming right up");
+				GraphVarient = ShortestPathGraph;
+				AntVarient = ShortestPathAnt;
 			break;
 			case 'literal':
+				console.log("literal ants, hot off the presses");
 				GraphVarient = LiteralGraph;
 				AntVarient = LiteralAnt;
 			break;
 			case 'spider':
+				console.log("Spider ants ahoy!");
 				GraphVarient = SpiderAntGraph;
 				AntVarient = SpiderAnt;
 			break;
@@ -1011,19 +1081,31 @@ program
 				throw new Error("Unknown construction '"+construction+"'");
 		}
 
-		console.info = function() {}
+		if (! program.verbose) {
+			console.info = function() {};
+		}
 
-		graph = new LiteralGraph(points);
-		aco = new ACOVarient(graph, {initial_pheromone: 10000}, LiteralAnt, program.numAnts);
+		var params = {
+			initial_pheromone: 1,
+			evaporation_decay: 0.2,
+			alpha: 1,
+			beta: 2.1
+		};
+
+		graph = new GraphVarient(points);
+		aco = new ACOVarient(graph, params, AntVarient, program.numAnts);
 		console.log(aco);
 		for (i = 0; i < program.numGenerations; i++) {
 			aco.runGeneration();
 		}
 		console.log(aco.solutions);
 		if (program.logFile) {
-			var stats = {
-				"generation bests": aco.solutions.generation_goodnesses,
-				"generation pheromone bests":  aco.generation_pheromones,
+			var stats = {}, x;
+			for (x in aco.solutions) {
+				if (aco.solutions[x] instanceof Array) {
+				console.log(x);
+					stats[x] = aco.solutions[x];
+				}
 			}
 			console.log(stats)
 			fs.writeFileSync(program.logFile, JSON.stringify(stats));
