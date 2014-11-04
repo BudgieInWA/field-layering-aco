@@ -124,8 +124,8 @@ function triangleArea(a, b, c) {
 function ShortestPathGraph(points) {
 	var i, j;
 
-	this.points = points;
 	this.size = points.length;
+	this.points = points;
 	
 	this.source = 0;
 	this.sink = 1;
@@ -255,11 +255,12 @@ ShortestPathAnt.prototype.solution = function () {
  * Literal Construction Graph guys                                           *
  *****************************************************************************/
 
-function LiteralGraph(points) {
+function LiteralGraph(points, start) {
 	var i, j, maxx = 0, minx = 1234567890;
 
 	this.size = points.length;
 	this.points = points;
+	this.start = start;
 
 	this.edges = [];
 	for (i = 0; i < this.size; i++) {
@@ -298,7 +299,7 @@ function NodeDLL(node, left, right) { // Node Doubly Linked List
 	this.left = left;
 	this.right = right;
 }
-function LiteralAnt(graph, choice_fn) {
+function LiteralAnt(graph, choice_fn, p) {
 	var i;
 	this.Ant = Ant;
 	this.Ant(graph, choice_fn);
@@ -313,22 +314,25 @@ function LiteralAnt(graph, choice_fn) {
 	}
 
 	this.is_done = false;
+
+	p = p || [0,4,6];
+	var a = p[0];
+	var b = p[1];
+	var c = p[2];
 	// Initialise by choosing random starting triangle.
-	this.edges = [new Edge(0,4), new Edge(4,6), new Edge(6,0)];
-	this.node_to_perim = {
-		0: new NodeDLL(0, 6, 4),
-		4: new NodeDLL(4, 0, 6),
-		6: new NodeDLL(6, 4, 0)
-	};
-	this.internal_edges = {
-		0: {4:4, 6:6},
-		4: {6:6, 0:0},
-		6: {0:0, 4:4}
-	}
-	this.outside_hull[0] = false;
-	this.outside_hull[4] = false;
-	this.outside_hull[6] = false;
-	this.area = triangleArea(this.graph.getPoint(0),this.graph.getPoint(4),this.graph.getPoint(6));
+	this.edges = [new Edge(a,b), new Edge(b,c), new Edge(c,a)];
+	this.node_to_perim = {};
+	this.node_to_perim[a] = new NodeDLL(a, c, b);
+	this.node_to_perim[b] = new NodeDLL(b, a, c);
+	this.node_to_perim[c] = new NodeDLL(c, b, a);
+	this.internal_edges = {};
+	this.internal_edges[a] = {b:b, c:c};
+	this.internal_edges[b] = {c:c, a:a};
+	this.internal_edges[c] = {a:a, b:b};
+	this.outside_hull[a] = false;
+	this.outside_hull[b] = false;
+	this.outside_hull[c] = false;
+	this.area = triangleArea(this.graph.getPoint(a),this.graph.getPoint(b),this.graph.getPoint(c));
 }
 LiteralAnt.prorotype = new Ant;
 
@@ -529,11 +533,12 @@ LiteralAnt.prototype.step = function() {
  * Spider Ant                                                                *
  *****************************************************************************/
 
-function SpiderAntGraph(points) {
+function SpiderAntGraph(points, start) {
 	var i, j;
 
 	this.size = points.length;
 	this.points = points;
+	this.start = start;
 
 	this.edges = [];
 	for (i = 0; i < this.size; i++) {
@@ -560,7 +565,7 @@ SpiderAntGraph.prototype.heuristic = function(e) {
 	return 10 / this.getPoint(e.from).sub(this.getPoint(e.to)).vecLength()
 }
 
-function SpiderAnt(graph, choice_fn) {
+function SpiderAnt(graph, choice_fn, ps) {
 	var i;
 	this.Ant = Ant;
 	this.Ant(graph, choice_fn);
@@ -573,8 +578,9 @@ function SpiderAnt(graph, choice_fn) {
 	this.is_done = false;
 
 	// Initialise by choosing random starting triangle.
-	this.current_nodes = [0, 4, 6];
-	this.area = triangleArea(this.graph.getPoint(0),this.graph.getPoint(4),this.graph.getPoint(6));
+	ps = ps || [0, 4, 6];
+	this.current_nodes = [ps[0], ps[1], ps[2]];
+	this.area = triangleArea(this.graph.getPoint(ps[0]),this.graph.getPoint(ps[1]),this.graph.getPoint(ps[2]));
 }
 SpiderAnt.prorotype = new Ant;
 
@@ -614,7 +620,7 @@ SpiderAnt.prototype.step = function() {
 			// Find out if the portal is on the "inside".
 			side1 = side(p(perm[0]), p(perm[1]), p(ns[perm[2]])); //TODO bring this outside portalLoop to make things faster.
 			side2 = side(p(perm[0]), p(perm[1]), p(n));
-			if (side2 == 0) continue new_node; // Colinear portals should not be considered.
+			if (side2 == 0 || side1 == 0) continue new_node; // Colinear portals should not be considered.
 			if (side1 == side2) {
 				if (old_node_i === null) { // First "inside" portal.
 					old_node_i = perm[2];
@@ -625,6 +631,11 @@ SpiderAnt.prototype.step = function() {
 		}
 
 		candidate_edges.push(new Edge(ns[old_node_i], n));
+	}
+
+	if (candidate_edges.length == 0) {
+		this.is_done = true;
+		return;
 	}
 
 	new_edge = this.chooseEdge(candidate_edges);
@@ -664,6 +675,7 @@ function ACO(graph, parameters, ant_type, num_ants) {
 function make_default_choice_fn(aco) {
 	return function(edges) {
 		console.info("choosing between", edges);
+		if (edges.length == 0) throw new Error("Asked to choose between zero edges");
 		var roll, i, j, e, pher, heur,
 			total_weight = 0,
 			weights = [];
@@ -683,6 +695,7 @@ function make_default_choice_fn(aco) {
 				pher = aco.getPheromone(e);
 				heur = aco.graph.heuristic(e);
 			}
+			//console.log(pher, heur)
 			weights[i] = Math.pow(pher, aco.parameters.alpha) + 
 			             Math.pow(heur, aco.parameters.beta);
 			total_weight += weights[i];
@@ -712,6 +725,7 @@ ACO.prototype.init = function () {
 		global_best: null,
 		generation_best: null,
 		generation_goodnesses: [],
+		generation_average_goodnesses: [],
 		generation_global_best: [],
 		generation_pheromones: [],
 		generation_average_pheromones: []
@@ -747,7 +761,7 @@ ACO.prototype.runGeneration = function() {
 		console.info("\tant", i);
 		// 1. Generate Ants
 		console.info("");
-		ant = new this.Ant(this.graph, this.choice_fn);
+		ant = new this.Ant(this.graph, this.choice_fn, this.graph.start);
 		//console.log("new ant", ant);
 
 		// 2. Generate Solutions.
@@ -780,6 +794,8 @@ ACO.prototype.runGeneration = function() {
 	this.solutions.generation_average_pheromones.push(total_pher / pher_count);
 
 	//Calculate some stats.
+	var total_goodness = 0;
+	var num_goodness = 0;
 	this.solutions.generation_best = null;
 	for (s = 0; s < solutions.length; s++) {
 		if (!this.solutions.global_best ||
@@ -790,16 +806,19 @@ ACO.prototype.runGeneration = function() {
 				solutions[s].goodness > this.solutions.generation_best.goodness) {
 			this.solutions.generation_best = solutions[s];
 		}
+		total_goodness += solutions[s].goodness;
+		num_goodness += 1;
 	}
 	this.solutions.generation_goodnesses.push(this.solutions.generation_best.goodness);
+	this.solutions.generation_average_goodnesses.push(total_goodness / num_goodness);
 	this.solutions.generation_global_best.push(this.solutions.global_best.goodness);
 
 	this.globalUpdatePheromone(solutions);
 
-	// modify alpha and beta
+	// Change alpha and beta over time.
 	//if (this.parameters.beta > 0.01) {
-//		this.parameters.beta -= 0.01;
-//	}
+	//	this.parameters.beta -= 0.01;
+	//}
 }
 
 ACO.prototype.globalUpdatePheromone = function(solutions) {
@@ -840,6 +859,8 @@ ElitistACO.prototype = new ACO;
 ElitistACO.prototype.globalUpdatePheromone = function(solutions) {
 	var s, e, i, N = 2;
 
+	/*
+	// Top N ants this generation lay pheromone.
 	solutions.sort(function(a,b) {return b.goodness-a.goodness;});
 	console.info(solutions)
 	for (s = 0; s < N; s++) {
@@ -858,6 +879,24 @@ ElitistACO.prototype.globalUpdatePheromone = function(solutions) {
 			}
 		} else { throw new Error("solution has no nodes or edges"); }
 	}
+	*/
+
+	// global best lays pheromone
+	var sol = this.solutions.global_best;
+	console.log("goodness me", sol.goodness);
+	if ("nodes" in sol) {
+		e = new Edge(-1, sol.nodes[0]);
+		for (i = 1; i < sol.nodes.length; i++) {
+			e.from = e.to;
+			e.to = sol.nodes[i];
+			this.setPheromone(e, this.getPheromone(e) + 1);
+		}
+	} else if ("edges" in sol) {
+		for (i = 0; i < sol.edges.length; i++) {
+			var pher = this.getPheromone(sol.edges[i]);
+			this.setPheromone(sol.edges[i], pher + 1);
+		}
+	} else { throw new Error("solution has no nodes or edges"); }
 }
 
 
@@ -865,7 +904,8 @@ ElitistACO.prototype.globalUpdatePheromone = function(solutions) {
  * Deterministic Algo                                                        *
  *****************************************************************************/
 
-/// Calculates optimal linking for the most area covered.
+/// Calculates optimal linking for the most area covered using only one
+/// triangle as the outer perimeter at any one time.
 ///
 /// This implementation uses a dynamic programming approach.
 /// time complexity: O(|thePortals| ^ 4)
@@ -961,6 +1001,7 @@ function computeOptimalSingleTriangleLayering(thePortals) {
   // For each starting triangle, record the best.
   bestAns = {value: 0, parentPortals: undefined, replacementPortal: undefined, anchors: undefined};
   bestAnsPortals = undefined;
+  var bestAnsPortalsInd = undefined;
   for (var i = 0; i < thePortals.length; i++) {
     for (var j = i+1; j < thePortals.length; j++) {
       for (var k = j+1; k < thePortals.length; k++) {
@@ -971,6 +1012,7 @@ function computeOptimalSingleTriangleLayering(thePortals) {
         if (ans.value > bestAns.value) {
           bestAns = ans;
           bestAnsPortals = [thePortals[i], thePortals[j], thePortals[k]];
+		  bestAnsPortalsInd = [i, j, k];
         }
       }
     }
@@ -993,7 +1035,7 @@ function computeOptimalSingleTriangleLayering(thePortals) {
 
   console.log("Best ans ",bestAns.value ," is base", bestAnsPortals, "with additional layers from", replacementPortals);
 
-  return {base: bestAnsPortals, replacements: replacementPortals, anchors: anchors};
+  return {value: ans.value, base: bestAnsPortals, baseInd: bestAnsPortalsInd, replacements: replacementPortals, anchors: anchors};
 }
 
 
@@ -1012,7 +1054,6 @@ var test_points = [
 	new Point(11,6),
 	new Point(9, 7)
 ];
-
 
 
 function random_points(num_points) {
