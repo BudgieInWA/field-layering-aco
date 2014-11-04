@@ -1,104 +1,80 @@
-/// Computes the heading of portal B from portal A.
-var headingCache = {}
-function heading(A, B) {
-  if (!(A in headingCache)) headingCache[A] = {};
-  if (B in headingCache[A]) return headingCache[A][B];
-  var ans = positiveBearing(google.maps.geometry.spherical.computeHeading(portals[A].ll, portals[B].ll));
-  headingCache[A][B] = ans;
-  return ans;
+"use strict";
+
+function Point(x, y) {
+	this.x = x;
+	this.y = y;
 }
 
-/// Turns a bearing into a positive bearing in the range (0, 360].
-function positiveBearing(h) {
-  while (h < 0) {
-    h += 360;
-  }
-  return h % 360;
+Point.prototype.dot = function(other) {
+	return  this.x * other.x + this.y * other.y;
+}
+Point.prototype.cross = function(other) {
+	return  this.x * other.y - this.y * other.x;
 }
 
-/// Turns a bearing into a small bearing in the range [-180, 180).
-function smallBearing(h) {
-  while (h <= -180) h += 360;
-  while (h >   180) h -= 360;
-  return h;
+Point.prototype.vecLength = function() {
+	return Math.sqrt(this.x*this.x + this.y*this.y);
+}
+Point.prototype.vecScaled = function(factor) {
+	return new Point(this.x*factor, this.y*factor);
+}
+Point.prototype.vecNormalised = function(factor) {
+	return this.vecScaled(1 / this.vecLength());
 }
 
-/// Determines which side of A->B portal C is on: 0 = "colinear", -1 = left, 1 = right.
-function side(A, B, C) {
-  var lineHeading = smallBearing(heading(A, B));
-  var AtoCHeading = smallBearing(heading(A, C));
-  var relativeHeading = smallBearing(AtoCHeading - lineHeading);
-  if (relativeHeading < 0) return -1;
-  if (relativeHeading > 0) return 1;
-  console.log("portals", A, B, C, "are 'colinear'");
-  return 0;
+Point.prototype.sub = function(other) {
+	return new Point(this.x - other.x, this.y - other.y);
 }
 
-/// Returns a list of portals in view.
-function getPortalsInView() {
-  var bounds = opmap.getBounds();
-  var ans = [];
-  for (var p in portals) {
-    if (bounds.contains(portals[p].ll)) {
-      ans.push(p);
-    }
-  }
-  return ans;
+/**
+ * Returns which side p is to the of the line l1 -> l2.
+ * -1 for left
+ * 0  for colinear
+ * 1  for right
+ */ 
+function side(l1, l2, p) {
+	var d = l2.sub(l1).cross( p.sub(l1) );
+	if (d > 0) return  1;
+	if (d < 0) return -1;
+	return 0;
 }
-  
-/// Calculates a maximal list of portals from portalGroup that can be used to create layered fields
-/// using anchorA -> anchorB as the base.
-/// All portals are string ids.
-function computeOptimalSingleBaseLayering(anchorA, anchorB, portalGroup) {
-  // Compute headings from anchors, relative to the heading of the base link.
-  var headingAB = heading(anchorA, anchorB);
-  var headingBA = heading(anchorB, anchorA);
-  var anglesFromA = {};
-  var anglesFromB = {};
-  for (var i = 0; i < portalGroup.length; i += 1) {
-    var p = portalGroup[i];
-    anglesFromA[p] = positiveBearing(heading(anchorA, p) - headingAB);
-    anglesFromB[p] = positiveBearing(heading(anchorB, p) - headingBA);
-  }
 
-  console.log("angles from A", anglesFromA);
-  console.log("angles from B", anglesFromB);
-
-  //TODO find out if we're sorting "outside in" or "inside out" and normalise to one or the other.
-
-  // Get two copies, one sorted by relative headings from each anchor.
-  var as = portalGroup.slice();
-  var bs = portalGroup.slice();
-  as.sort(function(a, b) { return anglesFromA[a] - anglesFromA[b]; });
-  bs.sort(function(a, b) { return anglesFromB[b] - anglesFromB[a]; }); // backwards
-
-  console.log("as", as);
-  console.log("bs", as);
-  
-  // LCS gives us a maximal choice of anchors.
-  return LCS(as, bs);
+/**
+ * Calculates the angle between base -> a and base -> b.
+ */ 
+Point.prototype.angle_between = function(a, b) {
+	var an = a.sub(this).vecNormalised(),
+		bn = b.sub(this).vecNormalised();
+	return Math.acos(an.dot(bn));
 }
+
+/**
+ * Calculates the area of a triangle.
+ */
+function triangleArea(a, b, c) {
+	return Math.abs(b.sub(a).cross( c.sub(a) )) / 2;
+}
+
+
 
 /// Calculates optimal linking for the most deeply nested fields possible.
 ///
 /// This implementation uses a dynamic programming approach.
 /// time complexity: O(|thePortals| ^ 4)
 /// space complexity: O(|thePortals| ^ 3)
-cachehits = 0;
-cachetries = 0;
 function computeOptimalSingleTriangleLayering(thePortals) {
   console.log("Computing Single Triangle Layering with", thePortals.length, "portals.");
   console.log("^4 is", thePortals.length * thePortals.length * thePortals.length * thePortals.length);
+
+  var bestAns, bestAnsPortals;
 
   // First we set up our cache for memoisation.
   var cache = {};
   function cache_get(ps) {
     ps.sort();
-    cachetries++;
     if (!(ps[0] in cache)) return undefined;
     if (!(ps[1] in cache[ps[0]])) return undefined;
     if (!(ps[2] in cache[ps[0]][ps[1]])) return undefined;
-    cachehits++;
     return cache[ps[0]][ps[1]][ps[2]];
   }
   function cache_put(ps, value) {
@@ -128,7 +104,7 @@ function computeOptimalSingleTriangleLayering(thePortals) {
       var p = thePortals[i];
 
       // The portal can't be one of the current portals.
-      if (p == ps[0] || p == ps[1] || p == ps[2]) continue;
+      if (i == ps[0] || i == ps[1] || i == ps[2]) continue;
 
       // The portal can be on the "inside" (the same side as the field) of exactly one edge.
       // If that is the case, the one such edge will be the base of the next layer.
@@ -140,8 +116,8 @@ function computeOptimalSingleTriangleLayering(thePortals) {
       for (var j = 0; j < perms.length; j++) {
         var perm = perms[j];
         // Find out if the portal is on the "inside".
-        var side1 = side(perm[0], perm[1], perm[2]); //TODO bring this outside portalLoop to make things faster.
-        var side2 = side(perm[0], perm[1], p);
+        var side1 = side(thePortals[perm[0]], thePortals[perm[1]], thePortals[perm[2]]); 
+        var side2 = side(thePortals[perm[0]], thePortals[perm[1]], p);
         if (side2 == 0) continue portalLoop; // Colinear portals should not be considered.
         if (side1 == side2) {
           if (anchorA === undefined) { // First "inside" portal.
@@ -154,10 +130,10 @@ function computeOptimalSingleTriangleLayering(thePortals) {
       }
 
       // p is valid so we can enclose the third portal by linking p to anchorA and anchorB.
-      var ans = howManyLayers([anchorA, anchorB, p]);
+      var ans = howManyLayers([anchorA, anchorB, i]);
       if (ans.value > bestVal) {
         bestVal = ans.value;
-        bestParentPortals = [anchorA, anchorB, p];
+        bestParentPortals = [anchorA, anchorB, i];
         bestReplacementPortal = p;
         bestAnchors = [anchorA, anchorB];
       }
@@ -165,7 +141,7 @@ function computeOptimalSingleTriangleLayering(thePortals) {
 
     // Add 1 for this field.
     var ans = {
-      value: bestVal + 1,
+      value: bestVal + triangleArea(thePortals[ps[0]], thePortals[ps[1]], thePortals[ps[2]]),
       parentPortals: bestParentPortals,
       replacementPortal: bestReplacementPortal,
       anchors: bestAnchors
@@ -183,7 +159,7 @@ function computeOptimalSingleTriangleLayering(thePortals) {
         // Colinear portals shouldn't be considered.
         if (side(thePortals[i], thePortals[j], thePortals[k]) == 0) continue;
 
-        var ans = howManyLayers([thePortals[i], thePortals[j], thePortals[k]]);
+        var ans = howManyLayers([i, j, k]);
         if (ans.value > bestAns.value) {
           bestAns = ans;
           bestAnsPortals = [thePortals[i], thePortals[j], thePortals[k]];
@@ -207,64 +183,25 @@ function computeOptimalSingleTriangleLayering(thePortals) {
     curAns = cache_get(curAns.parentPortals);
   }
 
-  console.log("Best ans is base", bestAnsPortals, "with additional layers from", replacementPortals);
+  console.log("Best ans ",bestAns.value ," is base", bestAnsPortals, "with additional layers from", replacementPortals);
 
   return {base: bestAnsPortals, replacements: replacementPortals, anchors: anchors};
 }
 
 
-/// Adds potential links for optimal layered fields.
-function addOptimalLayeringLinks() {
-  var anchorA = $('#layering-anchor-a').value()
-  var anchorB = $('#layering-anchor-b').value()
-  var others = getPortalsInView();
+var test_points = [
+  new Point(5, 5),
+  new Point(6, 9),
+  new Point(7,12),
+  new Point(8,10),
+  new Point(8, 9),
+  new Point(9, 3),
+  new Point(11,6),
+  new Point(9, 7)
+];
 
-  var theOnes = computeOptimalSingleBaseLayering(anchorA, anchorB, others);
-  console.log("Portals to use", theOnes);
-
-  addLink(anchorA, anchorB, 'layers');
-  for (var i = 0; i < theOnes.length; i += 1) {
-    addLink(theOnes[i], anchorA, 'layers');
-    addLink(theOnes[i], anchorB, 'layers');
-  }
-  redraw()
+function main() {
+  console.log(computeOptimalSingleTriangleLayering(test_points));
 }
 
-var innermostPoint = undefined;
-function chooseInnermostPoint() {
-  var listener = undefined;
-  listener = google.maps.event.addListener(opmap, 'click', function(e) {
-    innermostPoint = e.latLng;
-
-    // Restore the status quo.
-    google.maps.event.removeListener(listener);
-    $('#overlaytoggle').click();
-    alert("Innermost point selected!"); //TODO replace alert.
-  });
-
-  alert("Click on the map to choose an innermost point."); //TODO replace alert.
-  $('#overlaytoggle').click();
-}
-
-function clearInnermostPoint() {
-  innerMostPoint = undefined;
-}
-
-
-  
-
-function addDeepestLayeringLinks() {
-  var portalsInView = getPortalsInView();
-
-  var a = computeOptimalSingleTriangleLayering(portalsInView);
-
-  addLink(a.base[0], a.base[1], 'layers-0');
-  addLink(a.base[1], a.base[2], 'layers-0');
-  addLink(a.base[2], a.base[0], 'layers-0');
-  for (var i = 0; i < a.replacements.length; i++) {
-     addLink(a.replacements[i], a.anchors[i][0], 'layers-' + (i+1));
-     addLink(a.replacements[i], a.anchors[i][1], 'layers-' + (i+1));
-  }
-  redraw();
-}
-
+main();
