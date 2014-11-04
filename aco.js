@@ -98,6 +98,7 @@ function side(l1, l2, p) {
 	var d = l2.sub(l1).cross( p.sub(l1) );
 	if (d > 0) return  1;
 	if (d < 0) return -1;
+	console.msg("WARNNIG: colinear points");
 	return 0;
 }
 
@@ -319,7 +320,7 @@ function LiteralAnt(graph, choice_fn, p) {
 	var a = p[0];
 	var b = p[1];
 	var c = p[2];
-	// Initialise by choosing random starting triangle.
+	// TODO Initialise by choosing some random starting triangle.
 	this.edges = [new Edge(a,b), new Edge(b,c), new Edge(c,a)];
 	this.node_to_perim = {};
 	this.node_to_perim[a] = new NodeDLL(a, c, b);
