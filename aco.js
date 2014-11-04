@@ -1133,29 +1133,33 @@ program
 
 		var params = {
 			initial_pheromone: 1,
-			evaporation_decay: 0.2,
+			evaporation_decay: 0.05,
 			alpha: 1,
-			beta: 2.1
+			beta: 2.2
 		};
 
-		graph = new GraphVarient(points);
+		// get the deterministic solution and use it's starting triangle for the ants.
+		var ans = computeOptimalSingleTriangleLayering(points);
+
+		graph = new GraphVarient(points, ans.baseInd);
 		aco = new ACOVarient(graph, params, AntVarient, program.numAnts);
-		console.log(aco);
 		for (i = 0; i < program.numGenerations; i++) {
 			aco.runGeneration();
 		}
-		console.log(aco.solutions);
+		console.log(ans);
+		console.log(aco.solutions.global_best);
+
+		// Print stats to the requested stats file.
 		if (program.logFile) {
 			var stats = {}, x;
 			for (x in aco.solutions) {
 				if (aco.solutions[x] instanceof Array) {
-				console.log(x);
 					stats[x] = aco.solutions[x];
 				}
 			}
-			console.log(stats)
 			fs.writeFileSync(program.logFile, JSON.stringify(stats));
 		}
+
 	})
 
 program.parse(process.argv)
