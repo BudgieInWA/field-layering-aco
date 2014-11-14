@@ -1181,16 +1181,16 @@ program
 		console.log(aco.solutions.global_best);
 
 		// Print stats to the requested stats file.
-		if (program.logFile) {
+		if (program.statsFile) {
 			var stats = {}, x;
 			for (x in aco.solutions) {
 				if (aco.solutions[x] instanceof Array) {
 					stats[x] = aco.solutions[x];
 				}
 			}
-			fs.writeFileSync(program.logFile, JSON.stringify(stats));
+			fs.writeFileSync(program.statsFile, JSON.stringify(stats));
 		}
 
-	})
+	});
 
 program.parse(process.argv)
