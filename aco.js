@@ -45,7 +45,7 @@ Ant.prototype.done = function() {
 }
 
 /**
- * Returns the ants solution.
+ * Returns the ant's solution.
  *
  * This is an example function and should be replaced in sublcasses.
  */
@@ -98,7 +98,7 @@ function side(l1, l2, p) {
 	var d = l2.sub(l1).cross( p.sub(l1) );
 	if (d > 0) return  1;
 	if (d < 0) return -1;
-	console.msg("WARNNIG: colinear points");
+	console.msg("WARNNIG: colinear points", l1, l2, p);
 	return 0;
 }
 
@@ -122,6 +122,10 @@ function triangleArea(a, b, c) {
  * Shortest Path guys                                                        *
  *****************************************************************************/
 
+/**
+ * This is a graph of points with a start node, "source", and a destination node, "sink". It is used
+ * to solve the "shortest path between two points" problem for testing the ACO.
+ */
 function ShortestPathGraph(points) {
 	var i, j;
 
@@ -144,21 +148,6 @@ function ShortestPathGraph(points) {
 }
 ShortestPathGraph.prototype = new Graph;
 
-ShortestPathGraph.prototype.withEdgesFromHalfAdjList = function (adjacency_list) {
-	var i, j;
-
-	this.size = adjacency_list.length;
-	this.edges = [];
-	for (i = 0; i < adjacency_list.length; i++) this.edges.push([]);
-	for (i = 0; i < adjacency_list.length; i++) {
-		for (j = 0; j < adjacency_list[i].length; j++) {
-			this.edges[i].push(new Edge(i, adjacency_list[i][j]));
-			this.edges[adjacency_list[i][j]].push(new Edge(adjacency_list[i][j], i));
-		}
-	}
-	return this;
-}
-
 ShortestPathGraph.prototype.getEdgesFromNode = function(n) {
 	return this.edges[n];
 }
@@ -172,6 +161,9 @@ ShortestPathGraph.prototype.getCost = function(e) {
 	return x;
 }
 
+/**
+ * Calculates the shortest path through the graph from the source node to the sink node.
+ */
 ShortestPathGraph.prototype.getShortestPath = function() {
 	var i, j, n, e,
 		q = [],
@@ -208,6 +200,9 @@ ShortestPathGraph.prototype.getShortestPath = function() {
 }
 
 
+/**
+ * An ant that walks a ShortestPathGraph from the source to the sink, hoping for the shortest path.
+ */
 function ShortestPathAnt(graph, choice_fn) {
 	var i;
 
@@ -256,6 +251,9 @@ ShortestPathAnt.prototype.solution = function () {
  * Literal Construction Graph guys                                           *
  *****************************************************************************/
 
+/**
+ * This graph represents the "literal" construction of the optimal linking problem.
+ */
 function LiteralGraph(points, start) {
 	var i, j, maxx = 0, minx = 1234567890;
 
@@ -295,11 +293,21 @@ LiteralGraph.prototype.heuristic = function(e) {
 	return this.heuristic_scale/this.getPoint(e.from).sub(this.getPoint(e.to)).vecLength()
 }
 
-function NodeDLL(node, left, right) { // Node Doubly Linked List
+/**
+ * A doubly (indirectly) linked list of nodes. Suitable for storing and updating a cycle of nodes,
+ * such as for a perimeter.
+ */
+function NodeDLL(node, left, right) {
 	this.node = node;
 	this.left = left;
 	this.right = right;
 }
+
+/**
+ * This is an ant that walks a LiteralConstructionGraph hoping to cover the maximal amount of area
+ * with fields. It does so by maintaining a convex hull of fields and adding two or more edges to
+ * grow it each step.
+ */
 function LiteralAnt(graph, choice_fn, p) {
 	var i;
 	this.Ant = Ant;
@@ -348,6 +356,13 @@ LiteralAnt.prototype.solution = function() {
 	return {edges: this.edges, goodness: this.area};
 }
 
+/**
+ * This behemoth method grows the ant's convex hull by choosing an appropriate pair of edges
+ * attached to the hull, then creating any aditional links tbhat are needed to create fields with
+ * those new edges.
+ *
+ * O(|graph| * |perimetere|)
+ */
 LiteralAnt.prototype.step = function() {
 	if (this.done()) throw new Error("can't step when donw");
 
@@ -534,6 +549,10 @@ LiteralAnt.prototype.step = function() {
  * Spider Ant                                                                *
  *****************************************************************************/
 
+/**
+ * This graph represents the "tripod ant" construction, where an edge represents creating a new
+ * field that encloses the current triangle and shares a link.
+ */
 function SpiderAntGraph(points, start) {
 	var i, j;
 
@@ -566,6 +585,11 @@ SpiderAntGraph.prototype.heuristic = function(e) {
 	return 10 / this.getPoint(e.from).sub(this.getPoint(e.to)).vecLength()
 }
 
+/**
+ * An ant that walks a SpiderAntGraph. The ant maintains a single outer triangle and build apon this
+ * solution at each steo by choosing a new portal and linking to it from 2 of the current portals to
+ * create a new field that contains the current field (thus maintaining a single outer field).
+ */
 function SpiderAnt(graph, choice_fn, ps) {
 	var i;
 	this.Ant = Ant;
@@ -591,11 +615,17 @@ SpiderAnt.prototype.done = function() {
 
 SpiderAnt.prototype.solution = function() {
 	if (!this.done()) {
-		throw new Error("can't get solution of not done");
+		throw new Error("can't get solution if not done");
 	}
 	return {edges: this.construction_edges, goodness: this.area};
 }
 
+/**
+ * The ant chooses between all nodes outside the current triangle that can be used to create a new
+ * field which shares an edge with the current triangle and encloses the current triangle.
+ *
+ * O(|graph|)
+ */
 SpiderAnt.prototype.step = function() {
 	var i, j, n, perm, perms, side1, side2, new_node, new_edge, old_node_i,
 		candidate_edges = [],
@@ -1073,7 +1103,7 @@ program
 	.option('-a, --num-ants <count>', "Number of ants", 10)
 	.option('-g, --num-generations <count>', "Number of generations", 10)
 	.option('-r, --random-points <count>', "Use <count> randomly generated points", 10)
-	.option('-l, --log-file <file>', "Write stats to <file>")
+	.option('-s, --stats-file <file>', "Write stats to <file>")
 	.option('-p, --points [file]', "Load portals (points) from the specified file or stdin")
 	.option('-v, --verbose', "Be verbose");
 
@@ -1139,7 +1169,7 @@ program
 			beta: 2.2
 		};
 
-		// get the deterministic solution and use it's starting triangle for the ants.
+		// get the deterministic solution and use its starting triangle for the ants.
 		var ans = computeOptimalSingleTriangleLayering(points);
 
 		graph = new GraphVarient(points, ans.baseInd);
