@@ -122,7 +122,6 @@ ACO.prototype.runGeneration = function() {
 	for (i = 0; i < this.num_ants; i++) {
 		console.info("\tant", i);
 		// 1. Generate Ants
-		console.info("");
 		ant = new this.Ant(this.graph, this.choice_fn, this.graph.start);
 		//TODO starting triangle
 		//console.log("new ant", ant);
@@ -269,13 +268,13 @@ ElitistACO.prototype.globalUpdatePheromone = function(solutions) {
 
 var test_points = [
 	new geom.Point(5, 5),
+	new geom.Point(8, 9),
+	new geom.Point(9, 7),
 	new geom.Point(6, 9),
 	new geom.Point(7,12),
-	new geom.Point(8,10),
-	new geom.Point(8, 9),
+	new geom.Point(7.35,10),
 	new geom.Point(9, 3),
 	new geom.Point(11,6),
-	new geom.Point(9, 7)
 ];
 
 
@@ -294,7 +293,7 @@ program
 	.version('0.1.0')
 	.option('-a, --num-ants <count>', "Number of ants", 10)
 	.option('-g, --num-generations <count>', "Number of generations", 10)
-	.option('-r, --random-points <count>', "Use <count> randomly generated points", 10)
+	.option('-r, --random-points <count>', "Use <count> randomly generated points")
 	.option('-s, --stats-file <file>', "Write stats to <file>")
 	.option('-p, --points [file]', "Load portals (points) from the specified file or stdin")
 	.option('-v, --verbose', "Be verbose");
@@ -322,12 +321,11 @@ program
 		points = test_points;
 		if (program.randomPoints) {
 			points = random_points(program.randomPoints);
-		} if (program.points === true) {
-			//TODO read points from stdin
-			throw new Error("not yet implemented");
-		} else if (program.points !== undefined) {
-			//TODO read points from file
-			throw new Error("not yet implemented");
+		}
+		if (program.pointsFile === true) {
+			points = JSON.parse(process.stdin);
+		} else if (program.pointsFile !== undefined) {
+			points = JSON.parse( fs.readFileSync(program.pointsFile) );
 		}
 
 		var ans = null;
@@ -362,7 +360,6 @@ program
 			beta: 2.2
 		};
 
-		// get the deterministic solution and use its starting triangle for the ants.
 
 		graph = new GraphVarient(points);
 		aco = new ACOVarient(graph, params, AntVarient, program.numAnts);
