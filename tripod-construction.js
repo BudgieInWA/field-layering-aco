@@ -16,7 +16,7 @@ function SpiderAntGraph(points, start) {
 
 	this.size = points.length;
 	this.points = points;
-	this.start = start;
+	this.start = start || [0, 1, 2];
 
 	this.edges = [];
 	for (i = 0; i < this.size; i++) {
@@ -62,7 +62,7 @@ function SpiderAnt(graph, choice_fn, ps) {
 
 	// Initialise by choosing random starting triangle.
 	//TODO starting triangle
-	ps = ps || [0, 4, 6];
+	ps = ps || [0, 1, 2];
 	this.current_nodes = [ps[0], ps[1], ps[2]];
 	this.area = geom.triangleArea(this.graph.getPoint(ps[0]),this.graph.getPoint(ps[1]),this.graph.getPoint(ps[2]));
 }
@@ -120,7 +120,9 @@ SpiderAnt.prototype.step = function() {
 			}
 		}
 
-		candidate_edges.push(new interfaces.Edge(ns[old_node_i], n));
+		var candidate_edge = new interfaces.Edge(ns[old_node_i], n);
+		candidate_edge.old_node_i = old_node_i;
+		candidate_edges.push(candidate_edge);
 	}
 
 	if (candidate_edges.length == 0) {
@@ -129,7 +131,7 @@ SpiderAnt.prototype.step = function() {
 	}
 
 	new_edge = this.chooseEdge(candidate_edges);
-	ns[old_node_i] = new_edge.to;
+	ns[new_edge.old_node_i] = new_edge.to;
 	this.area += geom.triangleArea(p(ns[0]), p(ns[1]), p(ns[2]));
 	this.construction_edges.push(new_edge);
 }
