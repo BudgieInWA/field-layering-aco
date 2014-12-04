@@ -61,6 +61,7 @@ function SpiderAnt(graph, choice_fn, ps) {
 	this.is_done = false;
 
 	// Initialise by choosing random starting triangle.
+	//TODO starting triangle
 	ps = ps || [0, 4, 6];
 	this.current_nodes = [ps[0], ps[1], ps[2]];
 	this.area = geom.triangleArea(this.graph.getPoint(ps[0]),this.graph.getPoint(ps[1]),this.graph.getPoint(ps[2]));

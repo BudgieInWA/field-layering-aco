@@ -127,6 +127,7 @@ ACO.prototype.runGeneration = function() {
 		// 1. Generate Ants
 		console.info("");
 		ant = new this.Ant(this.graph, this.choice_fn, this.graph.start);
+		//TODO starting triangle
 		//console.log("new ant", ant);
 
 		// 2. Generate Solutions.
@@ -333,6 +334,7 @@ program
 			throw new Error("not yet implemented");
 		}
 
+		var ans = null;
 		switch(construction) {
 			case 'path': 
 				console.log("shortest path ants, coming right up");
@@ -365,12 +367,21 @@ program
 		};
 
 		// get the deterministic solution and use its starting triangle for the ants.
-		var ans = nestedDp.optimalNestedLayering(points);
 
-		graph = new GraphVarient(points, ans.baseInd);
+		graph = new GraphVarient(points);
 		aco = new ACOVarient(graph, params, AntVarient, program.numAnts);
 		for (i = 0; i < program.numGenerations; i++) {
 			aco.runGeneration();
+		}
+
+		switch (construction) {
+			case 'tripod':
+				// Optimal solution is calculated using the dynamic programming approach.
+				ans = nestedDp.optimalNestedLayering(points);
+			break;
+			case 'path': 
+				ans = graph.getShortestPath();
+			break;
 		}
 		console.log("Optimal Answer:", ans);
 		console.log("ACO Answer:", aco.solutions.global_best);
