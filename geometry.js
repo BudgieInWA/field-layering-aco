@@ -40,7 +40,7 @@ function side(l1, l2, p) {
 	var d = l2.sub(l1).cross( p.sub(l1) );
 	if (d > 0) return  1;
 	if (d < 0) return -1;
-	console.msg("WARNNIG: colinear points", l1, l2, p);
+	console.log("WARNNIG: colinear points", l1, l2, p);
 	return 0;
 }
 

@@ -136,9 +136,9 @@ function computeOptimalSingleTriangleLayering(thePortals) {
     curAns = cache_get(curAns.parentPortals);
   }
 
-  console.log("Best ans ",bestAns.value ," is base", bestAnsPortals, "with additional layers from", replacementPortals);
+  console.log("Best ans", bestAns.value ,"is base", bestAnsPortals, "with additional layers from", replacementPortals);
 
-  return {value: ans.value, base: bestAnsPortals, baseInd: bestAnsPortalsInd, replacements: replacementPortals, anchors: anchors};
+  return {value: bestAns.value, base: bestAnsPortals, baseInd: bestAnsPortalsInd, replacements: replacementPortals, anchors: anchors};
 }
 
 module.exports = {

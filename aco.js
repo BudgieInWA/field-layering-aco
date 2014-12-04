@@ -39,7 +39,6 @@ function ACO(graph, parameters, ant_type, num_ants) {
 
 function make_default_choice_fn(aco) {
 	return function(edges) {
-		console.info("choosing between", edges);
 		if (edges.length == 0) throw new Error("Asked to choose between zero edges");
 		var roll, i, j, e, pher, heur,
 			total_weight = 0,
@@ -65,10 +64,8 @@ function make_default_choice_fn(aco) {
 			             Math.pow(heur, aco.parameters.beta);
 			total_weight += weights[i];
 		}
-		console.info("weights", weights);
 
 		roll = Math.random() * total_weight;
-		console.info("weights", weights, roll);
 		for (i = 0; roll > weights[i]; i++) roll -= weights[i];
 		return edges[i];
 	}
@@ -249,7 +246,6 @@ ElitistACO.prototype.globalUpdatePheromone = function(solutions) {
 
 	// global best lays pheromone
 	var sol = this.solutions.global_best;
-	console.log("goodness me", sol.goodness);
 	if ("nodes" in sol) {
 		e = new interfaces.Edge(-1, sol.nodes[0]);
 		for (i = 1; i < sol.nodes.length; i++) {
