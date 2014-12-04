@@ -1,7 +1,7 @@
 Installing
 ==========
-Requires node.js and a node package:
-	$ npm install commander
+Requires node.js and some node packages:
+	$ npm install commander canvas
 
 Running
 =======
@@ -16,17 +16,6 @@ Hacking
 This is super work-in-progress hacktastic experimentation code. Many things are out of synch. You
 have been warned.
 
-aco.js
-------
-aco.js is a monolithic file with everything in it.
-
-First, there are some interface style classes (Graph, Ant). They aren't used directly, they're more
-an example of common functionality. They are also inherited from in a weird way.
-
-There are then multiple Ant implementations, (ShortestPath for testing and two problem
-onstructions) and ACO implementations.
-
-At the bottom is script stuff for testing and running the thing as a command line app.
 
 plot.py
 -------

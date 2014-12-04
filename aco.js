@@ -289,6 +289,7 @@ function random_points(num_points) {
 
 var fs = require('fs');
 var program = require('commander');
+var vis = require('./visualise.js');
 program
 	.version('0.1.0')
 	.option('-a, --num-ants <count>', "Number of ants", 10)
@@ -378,6 +379,20 @@ program
 		}
 		console.log("Optimal Answer:", ans);
 		console.log("ACO Answer:", aco.solutions.global_best);
+
+		// Save an image of the pheromone to a file.
+		// Generate edges of required format.
+		var edges = [];
+		var ii, jj;
+		for (ii = 0; ii < graph.size; ii++) {
+			for (jj = 0; jj < graph.size; jj++) {
+				if (ii == jj) continue;
+				var this_edge = new interfaces.Edge(points[ii],points[jj]);
+				this_edge.pheromone = aco.getPheromone(new interfaces.Edge(ii, jj));
+				edges.push(this_edge);
+			}
+		}
+		fs.writeFileSync('last_run_pherm.png', vis.renderPheromone(edges));
 
 		// Print stats to the requested stats file.
 		if (program.statsFile) {
