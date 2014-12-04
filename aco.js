@@ -361,24 +361,19 @@ program
 			beta: 2.2
 		};
 
+		// Optimal solution is calculated using the dynamic programming approach.
+		ans = nestedDp.optimalNestedLayering(points);
 
-		graph = new GraphVarient(points);
+		graph = new GraphVarient(points, ans.baseInd);
 		aco = new ACOVarient(graph, params, AntVarient, program.numAnts);
 		for (i = 0; i < program.numGenerations; i++) {
 			aco.runGeneration();
 		}
 
-		switch (construction) {
-			case 'tripod':
-				// Optimal solution is calculated using the dynamic programming approach.
-				ans = nestedDp.optimalNestedLayering(points);
-			break;
-			case 'path': 
-				ans = graph.getShortestPath();
-			break;
-		}
 		console.log("Optimal Answer:", ans);
 		console.log("ACO Answer:", aco.solutions.global_best);
+
+		console.log("Optimal:", ans.value, "\tACO:", aco.solutions.global_best.goodness);
 
 		// Save an image of the pheromone to a file.
 		// Generate edges of required format.
