@@ -60,8 +60,23 @@ function triangleArea(a, b, c) {
 	return Math.abs(b.sub(a).cross( c.sub(a) )) / 2;
 }
 
+
+/**
+ * Takes a list of Point-like objects (with an x and y attribute) and returns a
+ * list of corresponding Point objects.
+ */
+function jsonToPoints(json) {
+	var i;
+	var out = [];
+	for (i = 0; i < json.length; i++) {
+		out.push(new Point(json[i].x, json[i].y));
+	}
+	return out;
+}
+
 module.exports = {
 	side: side,
 	triangleArea: triangleArea,
 	Point: Point,
+	jsonToPoints: jsonToPoints,
 };

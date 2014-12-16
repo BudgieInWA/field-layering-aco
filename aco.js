@@ -285,7 +285,7 @@ program
 	.option('-g, --num-generations <count>', "Number of generations", 10)
 	.option('-r, --random-points <count>', "Use <count> randomly generated points")
 	.option('-s, --stats-file <file>', "Write stats to <file>")
-	.option('-p, --points [file]', "Load portals (points) from the specified file or stdin")
+	.option('-p, --points-file [file]', "Load portals (points) from the specified file or stdin")
 	.option('-v, --verbose', "Be verbose");
 
 program
@@ -313,9 +313,11 @@ program
 			points = random_points(program.randomPoints);
 		}
 		if (program.pointsFile === true) {
-			points = JSON.parse(process.stdin);
+			points = geom.jsonToPoints(JSON.parse(process.stdin));
+			console.log("loading points from stdin");
 		} else if (program.pointsFile !== undefined) {
-			points = JSON.parse( fs.readFileSync(program.pointsFile) );
+			points = geom.jsonToPoints(JSON.parse( fs.readFileSync(program.pointsFile) ));
+			console.log("loading points from", program.pointsFile);
 		}
 
 		var ans = null;
