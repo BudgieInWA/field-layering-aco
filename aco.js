@@ -3,8 +3,6 @@
 var interfaces = require('./interfaces.js');
 var geom = require('./geometry.js');
 
-var shortestPath = require('./shortest-path.js');
-var literal = require('./literal-construction.js');
 var tripod = require('./tripod-construction.js');
 
 var nestedDp = require('./nested-field-dp.js');
@@ -189,19 +187,10 @@ ACO.prototype.globalUpdatePheromone = function(solutions) {
 	// All ants lay pheromone.
 	this.solutions.generation_best = null;
 	for (s = 0; s < solutions.length; s++) {
-		if ("nodes" in solutions[s]) {
-			e = new interfaces.Edge(-1, solutions[s].nodes[0]);
-			for (i = 1; i < solutions[s].nodes.length; i++) {
-				e.from = e.to;
-				e.to = solutions[s].nodes[i];
-				this.setPheromone(e, this.getPheromone(e) + solutions[s].goodness);
-			}
-		} else if ("edges" in solutions[s]) {
-			for (i = 0; i < solutions[s].edges.length; i++) {
-				var pher = this.getPheromone(solutions[s].edges[i]);
-				this.setPheromone(solutions[s].edges[i], pher + solutions[s].goodness);
-			}
-		} else { throw new Error("solution has no nodes or edges"); }
+		for (i = 0; i < solutions[s].edges.length; i++) {
+			var pher = this.getPheromone(solutions[s].edges[i]);
+			this.setPheromone(solutions[s].edges[i], pher + solutions[s].goodness);
+		}
 	}
 }
 
@@ -300,10 +289,10 @@ program
 	.option('-v, --verbose', "Be verbose");
 
 program
-	.command('run <construction> [aco]')
+	.command('run [aco]')
 	.description("Run the given construction using the given ACO")
-	.action(function(construction, algo){
-		var GraphVarient, graph, AntVarient, ACOVarient, aco, points,
+	.action(function(algo){
+		var graph, ACOVarient, aco, points,
 			i;
 
 		switch (algo) {
@@ -330,25 +319,6 @@ program
 		}
 
 		var ans = null;
-		switch(construction) {
-			case 'path': 
-				console.log("shortest path ants, coming right up");
-				GraphVarient = shortestPath.Graph;
-				AntVarient = shortestPath.Ant;
-			break;
-			case 'literal':
-				console.log("literal ants, hot off the presses");
-				GraphVarient = literal.Graph;
-				AntVarient = literal.Ant;
-			break;
-			case 'tripod':
-				console.log("Tripod ants ahoy!");
-				GraphVarient = tripod.Graph;
-				AntVarient = tripod.Ant;
-			break;
-			default:
-				throw new Error("Unknown construction '"+construction+"'");
-		}
 
 		if (! program.verbose) {
 			console.info = function() {};
@@ -364,8 +334,8 @@ program
 		// Optimal solution is calculated using the dynamic programming approach.
 		ans = nestedDp.optimalNestedLayering(points);
 
-		graph = new GraphVarient(points, ans.baseInd);
-		aco = new ACOVarient(graph, params, AntVarient, program.numAnts);
+		graph = new tripod.Graph(points, ans.baseInd);
+		aco = new ACOVarient(graph, params, tripod.Ant, program.numAnts);
 		for (i = 0; i < program.numGenerations; i++) {
 			aco.runGeneration();
 		}
