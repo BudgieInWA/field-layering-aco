@@ -1,14 +1,13 @@
 Installing
 ==========
-Requires node.js and some node packages:
-	$ npm install commander canvas merge
+Requires node.js from http://node.org
+
+Simply clone the repo or copy the files.
 
 Running
 =======
 Run aco.js as a script:
 	$ node aco.js --help
-
-Some commands don't run exactly as advertised.
 
 Hacking
 =======
