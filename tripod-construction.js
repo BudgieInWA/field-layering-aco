@@ -136,6 +136,10 @@ SpiderAnt.prototype.step = function() {
 	this.construction_edges.push(new_edge);
 }
 
+function timeToExecutePlan(edges) {
+	console.log(edges);
+}
+
 module.exports = {
 	Ant: SpiderAnt,
 	Graph: SpiderAntGraph,
