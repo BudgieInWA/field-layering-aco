@@ -1,5 +1,5 @@
 {
-	"name": "Template Config",
+	"name": "Elitist on 100 random points",
 	"description": "",
 
 	"variant": "elitist",
@@ -17,11 +17,10 @@
 	},
 
 	"points": {
-		"source": "file",
-		"file": "my-points.json",
+		"source": "random",
 		"random": {
-			"count": 50
-		},
+			"count": 100
+		}
 	},
 
 	"plan_timing": {
@@ -31,9 +30,6 @@
 	},
 	"plan_time_limit": 20,
 
-	"calculate_optimal_solution": false,
-	"optimal_solution": {
-		"area": 123,
-		"TODO": "copy standard solution format in here",
-	}
+	"calculate_optimal_solution": true,
+	"optimal_solution": {}
 }

@@ -1,7 +1,7 @@
 Installing
 ==========
 Requires node.js and some node packages:
-	$ npm install commander canvas
+	$ npm install commander canvas merge
 
 Running
 =======

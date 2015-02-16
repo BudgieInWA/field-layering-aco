@@ -1,5 +1,7 @@
 "use strict";
 
+var merge = require('merge');
+
 var interfaces = require('./interfaces.js');
 var geom = require('./geometry.js');
 
@@ -280,27 +282,33 @@ var fs = require('fs');
 var program = require('commander');
 var vis = require('./visualise.js');
 program
-	.version('0.1.0')
-	.option('-a, --num-ants <count>', "Number of ants", 10)
-	.option('-g, --num-generations <count>', "Number of generations", 10)
-	.option('-r, --random-points <count>', "Use <count> randomly generated points")
-	.option('-s, --stats-file <file>', "Write stats to <file>")
-	.option('-p, --points-file [file]', "Load portals (points) from the specified file or stdin")
+	.version('0.2.0')
+	.option('-c, --partial-config <json-config>', "A partial JSON config to override the config file with", JSON.parse, '{}')
+	.option('-s, --stats-file <file>', "Write stats to <file>") 
 	.option('-v, --verbose', "Be verbose");
 
 program
-	.command('run [aco]')
-	.description("Run the given construction using the given ACO")
-	.action(function(algo){
-		var graph, ACOVarient, aco, points,
+	.command('tripod <config-file>')
+	.description("Run tripod ACO loading the configuration from a file")
+	.action(function(configFile){
+		var config, graph, ACOVarient, ans, aco, points,
 			i;
 
 		if (! program.verbose) {
 			console.info = function() {};
+		} else {
+			console.info = console.error;
 		}
 
-		switch (algo) {
+		// Parse config.
+		config = merge.recursive(JSON.parse(fs.readFileSync(configFile)),
+		                         program.partialConfig);
+		console.info("Config:", config);
+
+		// Choose variant.
+		switch (config.variant) {
 			case undefined:
+			case 'as':
 			case 'aco':
 				ACOVarient = ACO;
 			break;
@@ -308,48 +316,52 @@ program
 				ACOVarient = ElitistACO;
 			break;
 			default:
-				throw new Error("unknown ACO varient '"+algo+"'. Try aco or elitist.")
+				throw new Error("Unknown ACO varient '"+config.variant+"'. Try aco or elitist.")
 		}
+		console.info("Running tripod ACO with variant", config.variant);
 
-		console.info("Running with aco:", algo);
-
+		// Get points.
 		points = test_points;
-		if (program.randomPoints) {
-			points = random_points(program.randomPoints);
+		switch(config.points.source) {
+			case 'stdin':
+				console.info("Loading points from stdin...");
+				points = geom.jsonToPoints(JSON.parse(process.stdin));
+			break;
+			case 'random':
+				console.info("Generating", config.points.random.count, "random points...");
+				points = random_points(config.points.random.count);
+			break;
+			case 'file':
+				console.info("Loading points from file", config.points.file, "...");
+				points = geom.jsonToPoints(JSON.parse( fs.readFileSync(config.points.file) ));
+			break;
 		}
-		if (program.pointsFile === true) {
-			points = geom.jsonToPoints(JSON.parse(process.stdin));
-			console.log("loading points from stdin");
-		} else if (program.pointsFile !== undefined) {
-			points = geom.jsonToPoints(JSON.parse( fs.readFileSync(program.pointsFile) ));
-			console.log("loading points from", program.pointsFile);
-		}
+		console.info("Loaded", points.length, "points.");
 
-		console.info("Loaded", points.length, "points");
-
-		var ans = null;
-
-		var params = {
-			initial_pheromone: 1,
-			evaporation_decay: 0.05,
-			alpha: 1,
-			beta: 2.2
-		};
 
 		// Optimal solution is calculated using the dynamic programming approach.
-		ans = nestedDp.optimalNestedLayering(points);
+		if (config.calculate_optimal_solution) {
+			console.info("Calculating optimal solution...");
+			config.optimal_solution = nestedDp.optimalNestedLayering(points);
+		}
 
-		graph = new tripod.Graph(points, ans.baseInd); // Tell the graph what the optimal staring triangle is.
-		//TODO starting triangle stuff.
-		aco = new ACOVarient(graph, params, tripod.Ant, program.numAnts);
-		for (i = 0; i < program.numGenerations; i++) {
+		//TODO #3
+		console.log("Optimal area:", config.optimal_solution.value);
+		console.info("Optimal solution:", config.optimal_solution);
+
+		// Instantiate and run the ACO.
+		//TODO #3
+		//TODO #9 starting triangle stuff.
+		graph = new tripod.Graph(points, config.optimal_solution.baseInd); // Tell the graph what the optimal staring triangle is.
+		aco = new ACOVarient(graph, config.parameters, tripod.Ant, config.parameters.num_ants);
+		for (i = 0; i < config.termination.generation_limit; i++) {
 			aco.runGeneration();
 		}
 
-		console.log("Optimal Answer:", ans);
-		console.log("ACO Answer:", aco.solutions.global_best);
+		console.log("ACO area:", aco.solutions.global_best.goodness);
+		console.info("ACO area:", aco.solutions.global_best);
 
-		console.log("Optimal:", ans.value, "\tACO:", aco.solutions.global_best.goodness);
+		console.info("Optimal:", config.optimal_solution.value, "\tACO:", aco.solutions.global_best.goodness);
 
 		// Save an image of the pheromone to a file.
 		// Generate edges of required format.
