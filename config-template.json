@@ -1,0 +1,34 @@
+{
+	"name": "Template Config",
+	"description": "",
+
+	"variant": "elitist",
+	"parameters": {
+		"num_ants": 100,
+		"initial_pheromone": 1,
+		"evaporation_decay": 0.05,
+		"alpha": 1,
+		"beta": 2.2
+	},
+
+	"points": {
+		"file": "my-points.json",
+		"random": {
+			"count": 50
+		},
+		"__comment": "Supply only one argument to points."
+	},
+
+	"plan_timing": {
+		"portal_setup_time": 2,
+		"link_time": 0.5,
+		"travel_speed": 1
+	},
+	"plan_time_limit": 20,
+
+	"calculate_optimal_solution": false,
+	"optimal_solution": {
+		"area": 123,
+		"TODO": "copy standard solution format in here",
+	}
+}
