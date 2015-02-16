@@ -26,6 +26,7 @@ Point.prototype.vecNormalised = function(factor) {
 	return this.vecScaled(1 / this.vecLength());
 }
 
+/** Subtract other from this. */
 Point.prototype.sub = function(other) {
 	return new Point(this.x - other.x, this.y - other.y);
 }

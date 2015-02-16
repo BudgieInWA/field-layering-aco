@@ -9,7 +9,7 @@ var nestedDp = require('./nested-field-dp.js');
 
 
 /*****************************************************************************
- * Basic ACO                                                                 *
+ * Basic ACO (Ant System)                                                    *
  *****************************************************************************/
 
 function ACO(graph, parameters, ant_type, num_ants) {
@@ -153,7 +153,7 @@ ACO.prototype.runGeneration = function() {
 	this.solutions.generation_pheromones.push(m);
 	this.solutions.generation_average_pheromones.push(total_pher / pher_count);
 
-	//Calculate some stats.
+	// Calculate some stats.
 	var total_goodness = 0;
 	var num_goodness = 0;
 	this.solutions.generation_best = null;
@@ -295,6 +295,10 @@ program
 		var graph, ACOVarient, aco, points,
 			i;
 
+		if (! program.verbose) {
+			console.info = function() {};
+		}
+
 		switch (algo) {
 			case undefined:
 			case 'aco':
@@ -304,9 +308,10 @@ program
 				ACOVarient = ElitistACO;
 			break;
 			default:
-				throw new Error("unknown ACO varient '"+algo+"'")
+				throw new Error("unknown ACO varient '"+algo+"'. Try aco or elitist.")
 		}
 
+		console.info("Running with aco:", algo);
 
 		points = test_points;
 		if (program.randomPoints) {
@@ -320,11 +325,9 @@ program
 			console.log("loading points from", program.pointsFile);
 		}
 
-		var ans = null;
+		console.info("Loaded", points.length, "points");
 
-		if (! program.verbose) {
-			console.info = function() {};
-		}
+		var ans = null;
 
 		var params = {
 			initial_pheromone: 1,
@@ -336,7 +339,8 @@ program
 		// Optimal solution is calculated using the dynamic programming approach.
 		ans = nestedDp.optimalNestedLayering(points);
 
-		graph = new tripod.Graph(points, ans.baseInd);
+		graph = new tripod.Graph(points, ans.baseInd); // Tell the graph what the optimal staring triangle is.
+		//TODO starting triangle stuff.
 		aco = new ACOVarient(graph, params, tripod.Ant, program.numAnts);
 		for (i = 0; i < program.numGenerations; i++) {
 			aco.runGeneration();

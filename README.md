@@ -12,10 +12,10 @@ Some commands don't run exactly as advertised.
 
 Hacking
 =======
+Start with aco.js.
 
-This is super work-in-progress hacktastic experimentation code. Many things are out of synch. You
-have been warned.
-
+To run an aco, you need to combine a construction graph (such as that in tripod-construction.js) and
+an ACO (such as ACO in aco.js).
 
 plot.py
 -------
