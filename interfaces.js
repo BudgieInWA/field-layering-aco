@@ -59,8 +59,20 @@ Ant.prototype.solution = function () {
 	}
 }
 
+
+var Plan = function(initial_fields, replacement_portals, area) {
+	this.initial_portals = initial_fields;
+	this.portal_replacements = replacement_portals;
+	this.area = area;
+}
+
+Plan.prototype.getLinks = function() {
+	//TODO calculate and return all links.
+}
+
 module.exports = {
 	Ant: Ant,
 	Graph: Graph,
 	Edge: Edge,
+	Plan: Plan,
 };

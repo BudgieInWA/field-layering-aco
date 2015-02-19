@@ -1,5 +1,6 @@
 "use strict";
 
+var _ = require('underscore');
 var merge = require('merge');
 
 var interfaces = require('./interfaces.js');
@@ -108,8 +109,12 @@ ACO.prototype.setPheromone = function(e, v) {
 	this.pheromone[i][j] = v;
 }
 
-ACO.prototype.getBestSolution = function() {
-	return this.solutions.global_best;
+ACO.prototype.getCurrentPlan = function() {
+	var r = this.solutions.global_best;
+	return new interfaces.Plan(
+			r.initial_nodes,
+		   	_.map(r.edges, function(e) { return {old: e.from, 'new': e.to}; }),
+			r.goodness);
 }
 
 ACO.prototype.runGeneration = function() {
@@ -282,7 +287,7 @@ var fs = require('fs');
 var program = require('commander');
 var vis = require('./visualise.js');
 program
-	.version('0.2.0')
+	.version('0.2.1')
 	.option('-c, --partial-config <json-config>', "A partial JSON config to override the config file with", JSON.parse, '{}')
 	.option('-s, --stats-file <file>', "Write stats to <file>") 
 	.option('-v, --verbose', "Be verbose");
@@ -340,28 +345,24 @@ program
 
 
 		// Optimal solution is calculated using the dynamic programming approach.
-		if (config.calculate_optimal_solution) {
-			console.info("Calculating optimal solution...");
-			config.optimal_solution = nestedDp.optimalNestedLayering(points);
+		if (config.calculate_optimal_plan) {
+			console.log("Calculating optimal solution...");
+			config.optimal_plan = nestedDp.optimalNestedLayering(points);
 		}
 
-		//TODO #3
-		console.log("Optimal area:", config.optimal_solution.value);
-		console.info("Optimal solution:", config.optimal_solution);
 
 		// Instantiate and run the ACO.
-		//TODO #3
 		//TODO #9 starting triangle stuff.
-		graph = new tripod.Graph(points, config.optimal_solution.baseInd); // Tell the graph what the optimal staring triangle is.
+		graph = new tripod.Graph(points, config.optimal_plan.initial_portals); // Tell the graph what the optimal staring triangle is.
 		aco = new ACOVarient(graph, config.parameters, tripod.Ant, config.parameters.num_ants);
 		for (i = 0; i < config.termination.generation_limit; i++) {
 			aco.runGeneration();
 		}
 
-		console.log("ACO area:", aco.solutions.global_best.goodness);
-		console.info("ACO area:", aco.solutions.global_best);
+		console.log("Optimal Plan:", config.optimal_plan);
+		console.log("ACO Plan:", aco.getCurrentPlan());
 
-		console.info("Optimal:", config.optimal_solution.value, "\tACO:", aco.solutions.global_best.goodness);
+		console.log("Optimal:", config.optimal_plan.area, "\tACO:", aco.getCurrentPlan().area);
 
 		// Save an image of the pheromone to a file.
 		// Generate edges of required format.
@@ -390,4 +391,4 @@ program
 
 	});
 
-program.parse(process.argv)
+program.parse(process.argv);

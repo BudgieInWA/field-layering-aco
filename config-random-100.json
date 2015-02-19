@@ -30,6 +30,5 @@
 	},
 	"plan_time_limit": 20,
 
-	"calculate_optimal_solution": true,
-	"optimal_solution": {}
+	"calculate_optimal_plan": true
 }

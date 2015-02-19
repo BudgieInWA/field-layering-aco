@@ -54,7 +54,8 @@ function SpiderAnt(graph, choice_fn, ps) {
 	this.Ant(graph, choice_fn);
 	
 	this.area = 0;
-    this.construction_edges = [];
+    this.construction_edges = []; // Edges in the construction graph (not links!)
+	this.initial_nodes = []; // The portals in the initial field.
 
 	this.current_nodes = [];
 
@@ -64,6 +65,7 @@ function SpiderAnt(graph, choice_fn, ps) {
 	//TODO starting triangle
 	ps = ps || [0, 1, 2];
 	this.current_nodes = [ps[0], ps[1], ps[2]];
+	this.initial_nodes = [ps[0], ps[1], ps[2]];
 	this.area = geom.triangleArea(this.graph.getPoint(ps[0]),this.graph.getPoint(ps[1]),this.graph.getPoint(ps[2]));
 }
 SpiderAnt.prorotype = new interfaces.Ant;
@@ -76,7 +78,7 @@ SpiderAnt.prototype.solution = function() {
 	if (!this.done()) {
 		throw new Error("can't get solution if not done");
 	}
-	return {edges: this.construction_edges, goodness: this.area};
+	return {initial_nodes: this.initial_nodes, edges: this.construction_edges, goodness: this.area};
 }
 
 /**

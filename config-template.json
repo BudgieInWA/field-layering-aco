@@ -31,9 +31,13 @@
 	},
 	"plan_time_limit": 20,
 
-	"calculate_optimal_solution": false,
-	"optimal_solution": {
+	"calculate_optimal_plan": false,
+	"optimal_plan": {
 		"area": 123,
-		"TODO": "copy standard solution format in here",
+		"initial_portals": [1, 2, 3],
+		"portal_replacements": [
+			{"old": 1, "new": 4},
+			{"old": 2, "new": 5}
+		]
 	}
 }

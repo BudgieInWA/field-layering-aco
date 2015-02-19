@@ -35,9 +35,9 @@ function computeOptimalSingleTriangleLayering(thePortals) {
     cache[ps[0]][ps[1]][ps[2]] = value;
   }
 
-  // This is the recursive function, that calculates how many layers can be achieved when starting
+  // This is the recursive function, that calculates how much area can be achieved when starting
   // with a field made of the three portals in the list ps.
-  function howManyLayers(ps) {
+  function calculateBestAns(ps) {
     var c = cache_get(ps);
     if (c !== undefined) return c;
 
@@ -46,7 +46,7 @@ function computeOptimalSingleTriangleLayering(thePortals) {
     // We will test each of these by recursing and we will choose the best one as our answer.
     var bestVal = 0;
     var bestParentPortals = undefined;
-    var bestReplacementPortal = undefined;
+    var bestPortalReplacement = undefined;
     var bestAnchors = undefined;
 
     // Here we test each other portal, recusing if it's suitable.
@@ -61,6 +61,7 @@ function computeOptimalSingleTriangleLayering(thePortals) {
       // If that is the case, the one such edge will be the base of the next layer.
       var anchorA = undefined;
       var anchorB = undefined;
+	  var replaced = undefined;
       var perms = [[ps[0], ps[1], ps[2]],  // The three edges we need to test.
                    [ps[1], ps[2], ps[0]],
                    [ps[2], ps[0], ps[1]]];
@@ -74,6 +75,7 @@ function computeOptimalSingleTriangleLayering(thePortals) {
           if (anchorA === undefined) { // First "inside" portal.
             anchorA = perm[0];
             anchorB = perm[1];
+			replaced = perm[2];
           } else { // Second "inside" portal (i.e. it's invalid)
             continue portalLoop;
           }
@@ -81,11 +83,11 @@ function computeOptimalSingleTriangleLayering(thePortals) {
       }
 
       // p is valid so we can enclose the third portal by linking p to anchorA and anchorB.
-      var ans = howManyLayers([anchorA, anchorB, i]);
+      var ans = calculateBestAns([anchorA, anchorB, i]);
       if (ans.value > bestVal) {
         bestVal = ans.value;
         bestParentPortals = [anchorA, anchorB, i];
-        bestReplacementPortal = p;
+        bestPortalReplacement = {old: replaced, 'new': i};
         bestAnchors = [anchorA, anchorB];
       }
     }
@@ -94,7 +96,7 @@ function computeOptimalSingleTriangleLayering(thePortals) {
     var ans = {
       value: bestVal + geom.triangleArea(thePortals[ps[0]], thePortals[ps[1]], thePortals[ps[2]]),
       parentPortals: bestParentPortals,
-      replacementPortal: bestReplacementPortal,
+      portalReplacement: bestPortalReplacement,
       anchors: bestAnchors
     };
     cache_put(ps, ans);
@@ -102,16 +104,16 @@ function computeOptimalSingleTriangleLayering(thePortals) {
   }
 
   // For each starting triangle, record the best.
-  bestAns = {value: 0, parentPortals: undefined, replacementPortal: undefined, anchors: undefined};
+  bestAns = {value: 0, parentPortals: undefined, portalReplacement: undefined, anchors: undefined};
   bestAnsPortals = undefined;
   var bestAnsPortalsInd = undefined;
   for (var i = 0; i < thePortals.length; i++) {
     for (var j = i+1; j < thePortals.length; j++) {
       for (var k = j+1; k < thePortals.length; k++) {
         // Colinear portals shouldn't be considered.
-        if (geom.side(thePortals[i], thePortals[j], thePortals[k]) == 0) continue;
+        if (geom.side(thePortals[i], thePortals[j], thePortals[k]) === 0) continue;
 
-        var ans = howManyLayers([i, j, k]);
+        var ans = calculateBestAns([i, j, k]);
         if (ans.value > bestAns.value) {
           bestAns = ans;
           bestAnsPortals = [thePortals[i], thePortals[j], thePortals[k]];
@@ -128,7 +130,7 @@ function computeOptimalSingleTriangleLayering(thePortals) {
   var curAns = bestAns;
   while (curAns.parentPortals !== undefined) {
     // Find the new portal and add it to the list.
-    replacementPortals.push(curAns.replacementPortal);
+    replacementPortals.push(curAns.portalReplacement);
     anchors.push(curAns.anchors);
 
     // Move up the parent tree.
@@ -136,9 +138,9 @@ function computeOptimalSingleTriangleLayering(thePortals) {
     curAns = cache_get(curAns.parentPortals);
   }
 
-  console.log("Best ans", bestAns.value ,"is base", bestAnsPortals, "with additional layers from", replacementPortals);
+  console.info("DP: Best ans", bestAns.value ,"is base", bestAnsPortals, "with additional layers from", replacementPortals);
 
-  return {value: bestAns.value, base: bestAnsPortals, baseInd: bestAnsPortalsInd, replacements: replacementPortals, anchors: anchors};
+  return new interfaces.Plan(bestAnsPortalsInd, replacementPortals, bestAns.value);
 }
 
 module.exports = {
